@@ -1,0 +1,95 @@
+{"level":30,"time":"2023-07-12T18:42:21.820Z","pid":2548,"hostname":"Moby","msg":"Listening on 56827"}
+{"level":30,"time":"2023-07-12T18:42:22.227Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:22.228Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:22.231Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:22.231Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:22.250Z","pid":2548,"hostname":"Moby","msg":"Start of node method newBrowser"}
+{"level":30,"time":"2023-07-12T18:42:22.787Z","pid":2548,"hostname":"Moby","msg":"End of node method newBrowser"}
+{"level":30,"time":"2023-07-12T18:42:22.792Z","pid":2548,"hostname":"Moby","msg":"Start of node method newContext"}
+{"level":30,"time":"2023-07-12T18:42:22.793Z","pid":2548,"hostname":"Moby","msg":"currentBrowser: [object Object]"}
+{"level":30,"time":"2023-07-12T18:42:22.793Z","pid":2548,"hostname":"Moby","msg":"Trace file: "}
+{"level":30,"time":"2023-07-12T18:42:22.812Z","pid":2548,"hostname":"Moby","msg":"Changed active context"}
+{"level":30,"time":"2023-07-12T18:42:22.813Z","pid":2548,"hostname":"Moby","msg":"End of node method newContext"}
+{"level":30,"time":"2023-07-12T18:42:22.818Z","pid":2548,"hostname":"Moby","msg":"Start of node method newPage"}
+{"level":30,"time":"2023-07-12T18:42:22.819Z","pid":2548,"hostname":"Moby","msg":"currentBrowser: [object Object]"}
+{"level":30,"time":"2023-07-12T18:42:23.093Z","pid":2548,"hostname":"Moby","msg":"Video path: undefined"}
+{"level":30,"time":"2023-07-12T18:42:23.094Z","pid":2548,"hostname":"Moby","msg":"Changed active page"}
+{"level":30,"time":"2023-07-12T18:42:23.954Z","pid":2548,"hostname":"Moby","msg":"End of node method newPage"}
+{"level":30,"time":"2023-07-12T18:42:26.459Z","pid":2548,"hostname":"Moby","msg":"Start of node method goTo"}
+{"level":30,"time":"2023-07-12T18:42:26.477Z","pid":2548,"hostname":"Moby","msg":"Error of node method goTo"}
+================= Original suppressed error =================
+page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://www.hollandsnieuwe.nl/
+=========================== logs ===========================
+navigating to "https://www.hollandsnieuwe.nl/", waiting until "load"
+============================================================
+    at goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:8303:14)
+    at PlaywrightServer.goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:10016:34)
+    at C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server.js:821:17
+    at Http2ServerCallStream.safeDeserializeMessage (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:395:13)
+    at ServerHttp2Stream.onEnd (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:382:22) {
+  name: 'Error'
+}
+=============================================================
+{"level":30,"time":"2023-07-12T18:42:26.487Z","pid":2548,"hostname":"Moby","msg":"Start of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:26.707Z","pid":2548,"hostname":"Moby","msg":"End of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:26.716Z","pid":2548,"hostname":"Moby","msg":"Start of node method goTo"}
+{"level":30,"time":"2023-07-12T18:42:26.767Z","pid":2548,"hostname":"Moby","msg":"Error of node method goTo"}
+================= Original suppressed error =================
+page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://www.google.nl/
+=========================== logs ===========================
+navigating to "https://www.google.nl/", waiting until "load"
+============================================================
+    at goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:8303:14)
+    at PlaywrightServer.goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:10016:34)
+    at C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server.js:821:17
+    at Http2ServerCallStream.safeDeserializeMessage (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:395:13)
+    at ServerHttp2Stream.onEnd (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:382:22) {
+  name: 'Error'
+}
+=============================================================
+{"level":30,"time":"2023-07-12T18:42:26.772Z","pid":2548,"hostname":"Moby","msg":"Start of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:26.944Z","pid":2548,"hostname":"Moby","msg":"End of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:26.950Z","pid":2548,"hostname":"Moby","msg":"Start of node method goTo"}
+{"level":30,"time":"2023-07-12T18:42:26.972Z","pid":2548,"hostname":"Moby","msg":"Error of node method goTo"}
+================= Original suppressed error =================
+page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://www.hollandsnieuwe.nl/
+=========================== logs ===========================
+navigating to "https://www.hollandsnieuwe.nl/", waiting until "load"
+============================================================
+    at goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:8303:14)
+    at PlaywrightServer.goTo (C:\Python311\Lib\site-packages\Browser\wrapper\index.js:10016:34)
+    at C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server.js:821:17
+    at Http2ServerCallStream.safeDeserializeMessage (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:395:13)
+    at ServerHttp2Stream.onEnd (C:\Python311\Lib\site-packages\Browser\wrapper\node_modules\@grpc\grpc-js\build\src\server-call.js:382:22) {
+  name: 'Error'
+}
+=============================================================
+{"level":30,"time":"2023-07-12T18:42:26.977Z","pid":2548,"hostname":"Moby","msg":"Start of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:27.150Z","pid":2548,"hostname":"Moby","msg":"End of node method takeScreenshot"}
+{"level":30,"time":"2023-07-12T18:42:27.157Z","pid":2548,"hostname":"Moby","msg":"Start of node method goTo"}
+{"level":30,"time":"2023-07-12T18:42:27.762Z","pid":2548,"hostname":"Moby","msg":"End of node method goTo"}
+{"level":30,"time":"2023-07-12T18:42:27.773Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.797Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.798Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.801Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.803Z","pid":2548,"hostname":"Moby","msg":"Changed active context"}
+{"level":30,"time":"2023-07-12T18:42:27.803Z","pid":2548,"hostname":"Moby","msg":"Changing current active page"}
+{"level":30,"time":"2023-07-12T18:42:27.803Z","pid":2548,"hostname":"Moby","msg":"Changed active page"}
+{"level":30,"time":"2023-07-12T18:42:27.808Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.813Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.814Z","pid":2548,"hostname":"Moby","msg":"Start of node method switchBrowser"}
+{"level":30,"time":"2023-07-12T18:42:27.815Z","pid":2548,"hostname":"Moby","msg":"End of node method switchBrowser"}
+{"level":30,"time":"2023-07-12T18:42:27.816Z","pid":2548,"hostname":"Moby","msg":"Start of node method switchBrowser"}
+{"level":30,"time":"2023-07-12T18:42:27.816Z","pid":2548,"hostname":"Moby","msg":"End of node method switchBrowser"}
+{"level":30,"time":"2023-07-12T18:42:27.820Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.822Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.824Z","pid":2548,"hostname":"Moby","msg":"Changed active context"}
+{"level":30,"time":"2023-07-12T18:42:27.824Z","pid":2548,"hostname":"Moby","msg":"Changing current active page"}
+{"level":30,"time":"2023-07-12T18:42:27.824Z","pid":2548,"hostname":"Moby","msg":"Changed active page"}
+{"level":30,"time":"2023-07-12T18:42:27.827Z","pid":2548,"hostname":"Moby","msg":"Start of node method closeContext"}
+{"level":30,"time":"2023-07-12T18:42:27.840Z","pid":2548,"hostname":"Moby","msg":"Removed page=a44dfb5a-a568-4416-ac14-fa914578784a from context=de0607b5-c94f-4f92-a5e2-598facc01a13 page stack"}
+{"level":30,"time":"2023-07-12T18:42:27.871Z","pid":2548,"hostname":"Moby","msg":"End of node method closeContext"}
+{"level":30,"time":"2023-07-12T18:42:27.879Z","pid":2548,"hostname":"Moby","msg":"Start of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.879Z","pid":2548,"hostname":"Moby","msg":"End of node method getBrowserCatalog"}
+{"level":30,"time":"2023-07-12T18:42:27.939Z","pid":2548,"hostname":"Moby","msg":"Start of node method closeAllBrowsers"}
+{"level":30,"time":"2023-07-12T18:42:28.126Z","pid":2548,"hostname":"Moby","msg":"End of node method closeAllBrowsers"}
