@@ -19,7 +19,7 @@ class RequestLogger:
         if any(url in flow.request.pretty_url for url in self.custom_response_urls):
             for custom_response in self.custom_response_list:
                 if custom_response.url in flow.request.pretty_url:
-                    self.make_custom_response(flow, custom_response)
+                    self.update_request_with_custom_response(flow, custom_response)
 
     def add_to_blocklist(self, url):
         self.block_list.append(url)
@@ -28,11 +28,17 @@ class RequestLogger:
         try: self.block_list.remove(url)
         except: logger.warn(f"{url} was not found in blocklist")
 
-    def add_custom_response_item(self, url, overwrite_headers=None ,overwrite_body=None, status_code=200):
-        self.custom_response_list.append(DotDict({"url": url, "headers": overwrite_headers, "body": overwrite_body, "status_code": status_code}))
+    def add_custom_response_item(self, alias, url, overwrite_headers=None ,overwrite_body=None, status_code=200):
+        self.custom_response_list.append(DotDict({"alias": alias, "url": url, "headers": overwrite_headers, "body": overwrite_body, "status_code": status_code}))
         self.custom_response_urls.append(url)
 
-    def make_custom_response(self, flow, custom_response):
+    def remove_custom_response_item(self, alias: str):
+        alias_index = next((index for (index, d) in enumerate(self.custom_response_list) if d["alias"] == alias), None)
+        url_to_remove = self.custom_response_list[alias_index].url
+        self.custom_response_list.pop(alias_index)
+        self.custom_response_urls.remove(url_to_remove)
+
+    def update_request_with_custom_response(self, flow, custom_response):
         logger.info(f"Trying to update response for {custom_response.url}",also_console=True)
         try:
             flow.response = http.Response.make(

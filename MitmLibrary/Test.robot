@@ -15,7 +15,7 @@ Do A Test
     New Page  https://www.hollandsnieuwe.nl/
     ${body}  Create Dictionary  id=300  type=MEMBER_GET_MEMBER  subType=MGM_MIJNHN
     ${body}  Create List  ${body}
-    Make Custom Response    url=cm/online/features  overwrite_body=${body}
+    Add Custom Response    alias=features  url=cm/online/features  overwrite_body=${body}
     Reload
     Sleep  2s
     Add To Blocklist  hollandsnieuwe
@@ -25,7 +25,11 @@ Do A Test
     Should be True  not ${status}
     ${status}  Run keyword and return status  Go To  https://www.hollandsnieuwe.nl/
     Should be True  not ${status}
+    Show Blocked Urls
     Remove From Blocklist    hollandsnieuwe
     Go To  https://www.hollandsnieuwe.nl/
-    Should Start With    ktj  k 
+    Show Blocked Urls
+    Show Custom Response Items
+    Remove Custom Response  alias=features
+    Show Custom Response Items
     [Teardown]  Stop Proxy
