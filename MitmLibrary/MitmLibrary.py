@@ -8,6 +8,7 @@ from mitmproxy import options
 from mitmproxy.tools import dump
 
 from robot.api.deco import library, not_keyword
+from robot.api import logger
 
 @library(scope='SUITE',version=VERSION, auto_keywords=True)
 class MitmLibrary:
@@ -38,5 +39,15 @@ class MitmLibrary:
     def remove_from_blocklist(self, url):
         self.request_logger.remove_from_blocklist(url)
 
-    def make_custom_response(self, url, overwrite_headers="", overwrite_body="", status_code=200):
-        self.request_logger.add_custom_response_item(url, overwrite_headers, overwrite_body,status_code)
+    def add_custom_response(self, alias, url, overwrite_headers="", overwrite_body="", status_code=200):
+        self.request_logger.add_custom_response_item(alias, url, overwrite_headers, overwrite_body,status_code)
+
+    def remove_custom_response(self,alias):
+        self.request_logger.remove_custom_response_item(alias)
+
+    def show_custom_response_items(self):
+        logger.info(self.request_logger.custom_response_list)
+        logger.info(self.request_logger.custom_response_urls)
+
+    def show_blocked_urls(self):
+        logger.info(self.request_logger.block_list)
