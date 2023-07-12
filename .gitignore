@@ -1,0 +1,11 @@
+#robot files
+log.html
+output.xml
+*.png
+playwright-log.txt
+report.html
+
+#pycache
+__pycache__
+*.pyc
+
