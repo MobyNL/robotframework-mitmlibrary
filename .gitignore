@@ -9,3 +9,8 @@ report.html
 __pycache__
 *.pyc
 
+#mitm
+certificates
+
+#vscode
+.vscode
