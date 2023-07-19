@@ -18,6 +18,17 @@ class MitmLibrary:
     traffic. This enables us to manipulate our traffic on request level, without needing
     to build stubs or mocks.
 
+    = Why use Mitm? =
+    Mitm allows manipulation on single browser instance, by using a proxy. It does not
+    require you to set up stubs or mocks that might influence the entire application at
+    once, also resulting in stubbed/mocked behaviour while manual testing.
+
+    Examples where Mitm is useful: 
+    - When running in parallel, if you do not want your other instances to be influenced. 
+    - Manipulate the response of a request to see how the front end handles it for a integrated service that is always up.
+    - Or if stubs or mocks are not available (yet).
+    - Or if their behaviour is not sufficient.
+
     = Mitm Certificates =
     To test with SSL verification, you will need to set up the certificates related to
     mitm. Follow the guide on the 
@@ -57,10 +68,6 @@ class MitmLibrary:
         part of the pretty_url of the host it will be blocked."""
         self.request_logger.add_to_blocklist(url)
 
-    def remove_from_blocklist(self, url):
-        """Removes a custom (partial) url from the list."""
-        self.request_logger.remove_from_blocklist(url)
-
     def add_custom_response(self, alias, url, overwrite_headers=None,
                             overwrite_body=None, status_code=200):
         """Adds a custom response based on a (partial) url to the list of blocked urls.
@@ -69,9 +76,17 @@ class MitmLibrary:
         self.request_logger.add_custom_response_item(alias, url, overwrite_headers,
                                                      overwrite_body, status_code)
 
-    def remove_custom_response(self, alias):
-        """Removes a custom response from the list, based on it's alias."""
-        self.request_logger.remove_custom_response_item(alias)
+    def add_custom_response_status_code(self,alias, url, status_code=200):
+        """Adds a custom response status_code to each request where the url matches with
+        the url of the custom status_code.
+        
+        Often used status codes:
+        - 200. Success
+        - 401. 
+        - 403. Unauthorized
+        - 404. Not found
+        - 500. Server error
+        """
 
     def log_custom_response_items(self):
         """Logs the current list of url that will result in a custom response, if the 
@@ -88,3 +103,15 @@ class MitmLibrary:
         block_items = ", ".join(self.request_logger.block_list)
         logger.info(f"URLs containing any of the following in their url will "
                     f"be blocked: {block_items}.")
+
+    def remove_url_from_blocklist(self, url):
+        """Removes a custom (partial) url from the list."""
+        self.request_logger.remove_from_blocklist(url)
+
+    def remove_custom_response(self, alias):
+        """Removes a custom response from the list, based on it's alias."""
+        self.request_logger.remove_custom_response_item(alias)
+
+    def remove_custom_status_code(self, alias):
+        """Removes a custom status_code from the list."""
+        self.request_logger.remove_custom_status(alias)

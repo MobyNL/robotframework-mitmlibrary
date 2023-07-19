@@ -29,7 +29,7 @@ Do A Test
     Sleep  2s
     Should be True  not ${status}
     Log Blocked Urls
-    Remove From Blocklist    hollandsnieuwe
+    Remove Url From Blocklist    hollandsnieuwe
     Go To  https://www.hollandsnieuwe.nl/
     Sleep  2s
     Log Blocked Urls
