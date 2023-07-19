@@ -14,3 +14,6 @@ __pycache__
 *.cer
 *.p12
 *.pem
+
+#vscode
+.vscode

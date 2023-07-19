@@ -10,7 +10,7 @@ Library    Dialogs
 *** Test Cases ***
 Do A Test
     Start Proxy  localhost  ${8080}  certificates_directory=./certificates
-    New Browser  browser=chromium  headless=False  proxy=${PROXY_DICT}  devtools=True
+    New Browser  browser=chromium  headless=False  proxy=${PROXY_DICT}
     New Context
     New Page  https://www.hollandsnieuwe.nl/
     ${body}  Create Dictionary  id=300  type=MEMBER_GET_MEMBER  subType=MGM_MIJNHN
@@ -20,16 +20,20 @@ Do A Test
     Sleep  2s
     Add To Blocklist  hollandsnieuwe
     ${status}  Run keyword and return status  Go To  https://www.hollandsnieuwe.nl/
+    Sleep  2s
     Add To Blocklist  google
     ${status}  Run keyword and return status  Go To  https://www.google.nl/
+    Sleep  2s
     Should be True  not ${status}
     ${status}  Run keyword and return status  Go To  https://www.hollandsnieuwe.nl/
+    Sleep  2s
     Should be True  not ${status}
-    Show Blocked Urls
-    Remove From Blocklist    hollandsnieuwe
+    Log Blocked Urls
+    Remove Url From Blocklist    hollandsnieuwe
     Go To  https://www.hollandsnieuwe.nl/
-    Show Blocked Urls
-    Show Custom Response Items
+    Sleep  2s
+    Log Blocked Urls
+    Log Custom Response Items
     Remove Custom Response  alias=features
-    Show Custom Response Items
+    Log Custom Response Items
     [Teardown]  Stop Proxy
