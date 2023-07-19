@@ -10,6 +10,7 @@ class RequestLogger:
         self.block_list = []
         self.custom_response_list = []
         self.custom_response_urls = []
+        self.custom_response_status = []
 
     def request(self, flow: http.HTTPFlow) -> None:
         if any(url in flow.request.pretty_url for url in self.block_list):
@@ -18,11 +19,17 @@ class RequestLogger:
                     flow.kill()
 
     def response(self, flow: http.HTTPFlow) -> None:
-        if any(url in flow.request.pretty_url for url in self.custom_response_urls):
+        custom_status_urls = [status.url for status in self.custom_response_status]
+        custom_response_urls = [response.url for response in self.custom_response_list]
+        if any(url in flow.request.pretty_url for url in custom_response_urls):
             for custom_response in self.custom_response_list:
                 if custom_response.url in flow.request.pretty_url:
                     self.update_request_with_custom_response(
                         flow, custom_response)
+        if any(url in flow.request.pretty_url for url in custom_status_urls):
+            for custom_status in self.custom_response_status:
+                if custom_status.url in flow.request.pretty_url:
+                    flow.response.status_code=custom_status.status_code
 
     def add_to_blocklist(self, url):
         self.block_list.append(url)
@@ -59,3 +66,12 @@ class RequestLogger:
         except:
             logger.info(
                 f"Updating response for {custom_response.url} failed", also_console=True)
+
+    def add_custom_response_status(self, alias, url, status_code):
+        self.custom_response_list.append(DotDict(
+            {"alias": alias, "url": url, "status_code": status_code}))
+
+    def remove_custom_status(self, alias: str):
+        alias_index = next((index for (index, d) in enumerate(
+            self.custom_response_status) if d["alias"] == alias), None)
+        self.custom_response_status.pop(alias_index)
