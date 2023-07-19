@@ -94,8 +94,10 @@ class MitmLibrary:
 
         Will also log the custom response items themselves."""
         custom_responses = ", ".join(self.request_logger.custom_response_urls)
-        logger.info(f"The following custom response are currently loaded: "
+        logger.info(f"The following custom responses are currently loaded: "
                     f"{custom_responses}.")
+        for response in self.request_logger.custom_response_list:
+            logger.info(f"{response}")
 
     def log_blocked_urls(self):
         """Logs the current list of items that will result in a block, if the url is
