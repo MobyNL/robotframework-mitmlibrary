@@ -55,11 +55,21 @@ class RequestLogger:
     def update_request_with_custom_response(self, flow, custom_response):
         logger.info(
             f"Trying to update response for {custom_response.url}", also_console=True)
+        if custom_response.headers:
+            header_list = []
+            for key, value in custom_response.headers.items():
+                logger.info(key, also_console=True)
+                header_list.append((bytes(key, 'utf-8'),bytes(value, 'utf-8')))
+            headers = http.Headers(header_list)
+        elif hasattr(flow,'headers'):
+            headers = flow['headers']
+        else:
+            headers = http.Headers()
         try:
             flow.response = http.Response.make(
                 custom_response.status_code,
                 safe_str(custom_response.body),
-                custom_response.headers
+                headers
             )
             logger.info(
                 f"Succesfully updated response for {custom_response.url}", also_console=True)
