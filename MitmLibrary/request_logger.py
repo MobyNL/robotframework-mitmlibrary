@@ -38,7 +38,7 @@ class RequestLogger:
             for response_delay in self.response_delays_list:
                 if response_delay.url in flow.request.pretty_url:
                     logger.info(f"Delay response for {response_delay.url} for "
-                                "{response_delay.delay} seconds", also_console=True)
+                                f"{response_delay.delay} seconds", also_console=True)
                     time_sleep(timestr_to_secs(response_delay.delay))
                     flow = flow
 
@@ -65,7 +65,6 @@ class RequestLogger:
     def add_custom_response_item(self, alias, url, overwrite_headers=None, overwrite_body=None, status_code=200):
         self.custom_response_list.append(DotDict(
             {"alias": alias, "url": url, "headers": overwrite_headers, "body": overwrite_body, "status_code": status_code}))
-        self.custom_response_urls.append(url)
 
     def remove_custom_response_item(self, alias: str):
         alias_index = next((index for (index, d) in enumerate(
