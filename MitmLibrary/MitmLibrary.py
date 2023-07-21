@@ -75,29 +75,29 @@ class MitmLibrary:
         will be changed ."""
         self.request_logger.add_custom_response_item(alias, url, overwrite_headers,
                                                      overwrite_body, status_code)
+    
+    def add_response_delay(self, alias, url, delay):
+        self.request_logger.add_response_delay_item(alias,url,delay)
 
-    def add_custom_response_status_code(self,alias, url, status_code=200):
-        """Adds a custom response status_code to each request where the url matches with
-        the url of the custom status_code.
+    def add_custom_response_status_code(self, alias, url, status_code=200):
+        """Adds a custom response status_code to each request where the url contains
+        the (partial) url of the custom status_code.
         
         Often used status codes:
         - 200. Success
-        - 401. 
-        - 403. Unauthorized
+        - 401. Unauthorized
+        - 403. Forbidden
         - 404. Not found
-        - 500. Server error
+        - 418. I'm a Teapot
+        - 500. Internal Server error
+
+        For more information, visit: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
         """
 
-    def log_custom_response_items(self):
-        """Logs the current list of url that will result in a custom response, if the 
-        url is found in the pretty_url of a host.
-
-        Will also log the custom response items themselves."""
-        custom_responses = ", ".join(self.request_logger.custom_response_urls)
-        logger.info(f"The following custom responses are currently loaded: "
-                    f"{custom_responses}.")
-        for response in self.request_logger.custom_response_list:
-            logger.info(f"{response}")
+    def clear_all_proxy_items(self):
+        """Removes all custom responses, blocked urls, etc. Basically, this acts as
+        restarting the proxy, without actually restarting the proxy."""
+        self.request_logger.clear_all_proxy_items()
 
     def log_blocked_urls(self):
         """Logs the current list of items that will result in a block, if the url is
@@ -105,6 +105,33 @@ class MitmLibrary:
         block_items = ", ".join(self.request_logger.block_list)
         logger.info(f"URLs containing any of the following in their url will "
                     f"be blocked: {block_items}.")
+
+    def log_delayed_responses(self):
+        delayed_items = ", ".join([response.url for response in self.request_logger.response_delays_list])
+        logger.info(f"URLs containing any of the following in their url will "
+                    f"be delayed: {delayed_items}.")
+
+    def log_custom_response_items(self):
+        """Logs the current list of urls that will result in a custom response, if the 
+        url is found in the pretty_url of a host.
+
+        Will also log the custom response items themselves."""
+        custom_responses = ", ".join([response.url for response in self.request_logger.custom_response_list])
+        logger.info(f"The following custom responses are currently loaded: "
+                    f"{custom_responses}.")
+        for response in self.request_logger.custom_response_list:
+            logger.info(f"{response}")
+
+    def log_custom_status_items(self):
+        """Logs the current list of urls that will result in a custom response, if the 
+        url is found in the pretty_url of a host.
+
+        Will also log the custom response items themselves."""
+        custom_responses = ", ".join(self.request_logger.custom_response_status)
+        logger.info(f"The following custom responses are currently loaded: "
+                    f"{custom_responses}.")
+        for response in self.request_logger.custom_response_status:
+            logger.info(f"{response}")
 
     def remove_url_from_blocklist(self, url):
         """Removes a custom (partial) url from the list."""

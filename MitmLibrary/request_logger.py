@@ -1,6 +1,8 @@
+from time import sleep as time_sleep
 from mitmproxy import http
 
 from robot.api import logger
+from robot.utils import timestr_to_secs
 from robot.utils import safe_str, DotDict
 
 
@@ -9,8 +11,8 @@ class RequestLogger:
         self.master = master
         self.block_list = []
         self.custom_response_list = []
-        self.custom_response_urls = []
         self.custom_response_status = []
+        self.response_delays_list = []
 
     def request(self, flow: http.HTTPFlow) -> None:
         if any(url in flow.request.pretty_url for url in self.block_list):
@@ -21,6 +23,7 @@ class RequestLogger:
     def response(self, flow: http.HTTPFlow) -> None:
         custom_status_urls = [status.url for status in self.custom_response_status]
         custom_response_urls = [response.url for response in self.custom_response_list]
+        delay_response_urls = [response.url for response in self.response_delays_list]
         if any(url in flow.request.pretty_url for url in custom_response_urls):
             for custom_response in self.custom_response_list:
                 if custom_response.url in flow.request.pretty_url:
@@ -31,8 +34,27 @@ class RequestLogger:
                 if custom_status.url in flow.request.pretty_url:
                     flow.response.status_code=custom_status.status_code
 
+        if any(url in flow.request.pretty_url for url in delay_response_urls):
+            for response_delay in self.response_delays_list:
+                if response_delay.url in flow.request.pretty_url:
+                    logger.info(f"Delay response for {response_delay.url} for "
+                                "{response_delay.delay} seconds", also_console=True)
+                    time_sleep(timestr_to_secs(response_delay.delay))
+                    flow = flow
+
     def add_to_blocklist(self, url):
         self.block_list.append(url)
+
+    def add_response_delay_item(self, alias, url, delay):
+        self.response_delays_list.append(DotDict(
+            {"alias": alias, "url": url, "delay": delay}
+        ))
+
+    def clear_all_proxy_items(self):
+        self.block_list.clear()
+        self.custom_response_list.clear()
+        self.custom_response_status.clear()
+        self.response_delays_list.clear()
 
     def remove_from_blocklist(self, url):
         try:
