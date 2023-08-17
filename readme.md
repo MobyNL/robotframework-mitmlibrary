@@ -17,7 +17,7 @@ The Robot Framework MITM Library is a custom library for [Robot Framework](https
 
 1. Install Robot Framework (if not already installed):
 2. Install mitm library using pip:
-pip install robotframework-mitmlibrary
+`pip install robotframework-mitmlibrary`
 
 
 ## Usage
