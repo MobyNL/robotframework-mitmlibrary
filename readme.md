@@ -1,6 +1,6 @@
 # Robot Framework MITM Library
 
-![Robot Framework Logo](https://robotframework.org/robotframework/latest/RobotFrameworkLogo.png)
+![Robot Framework Logo](https://robotframework.org/img/RF.svg)
 
 ## Overview
 
