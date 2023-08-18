@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'robotframework-mitmlibrary',
   packages = ['MitmLibrary'],
-  version = '0.1',
+  version = '0.1.1',
   license='MIT',
   description = 'Wrapper for mitmproxy with Robot Framework',
   author = 'Mark Moberts',
