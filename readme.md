@@ -38,6 +38,23 @@ Test MITM Proxy
     <!-- TODO: Add keywords -->
     Stop MITM Proxy    # Stop the MITM proxy server
 ```
+
+### Why use Mitm?
+Mitm allows manipulation on single browser instance, by using a proxy. It does not
+require you to set up stubs or mocks that might influence the entire application at
+once, also resulting in stubbed/mocked behaviour while manual testing.
+
+Examples where Mitm is useful: 
+- When running in parallel, if you do not want your other instances to be influenced. 
+- Manipulate the response of a request to see how the front end handles it for a integrated services that are always up.
+- When stubs or mocks are not available.
+- When stub or mock behaviour is not sufficient for your testing needs.
+
+### Mitm Certificates
+To test with SSL verification, you will need to set up the certificates related to
+mitm. Follow the guide on the 
+[Mitm website](https://docs.mitmproxy.org/stable/concepts-certificates/)
+
 ## Documentation
 For detailed information on the available keywords and usage examples, please refer to the Library Documentation.
 
