@@ -1,14 +1,14 @@
 from distutils.core import setup
 setup(
   name = 'robotframework-mitmlibrary',
-  packages = ['robotframework-mitmlibrary'],
-  version = '0.1',
+  packages = ['MitmLibrary'],
+  version = '0.1.1',
   license='MIT',
-  description = 'Wrapper for mitmproxy with robotframework',
+  description = 'Wrapper for mitmproxy with Robot Framework',
   author = 'Mark Moberts',
   author_email = 'markmoberts@gmail.com',
   url = 'https://github.com/MobyNL/robotframework-mitmlibrary',
-  download_url = 'https://github.com/user/reponame/archive/v_01.tar.gz',
+  download_url = 'https://github.com/MobyNL/robotframework-mitmlibrary/archive/refs/tags/0.1.tar.gz',
   keywords = ['robotframework', 'automation', 'testautomation','testing','mitm','maninthemiddle'],
   install_requires=[
           'mitm',

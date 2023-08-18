@@ -18,4 +18,8 @@ __pycache__
 #vscode
 .vscode
 interactive_console_output.xml
-MitmLibrary.egg-info
+
+#python files
+*.egg-info
+*.tar.gz
+
