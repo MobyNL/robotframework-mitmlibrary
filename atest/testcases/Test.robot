@@ -1,5 +1,5 @@
 *** Settings ***
-Library  ../../MitmLibrary/MitmLibrary.py
+Library  ../../MitmLibrary/__init__.py
 Library  Process
 Library  Browser
 Library  RequestsLibrary
