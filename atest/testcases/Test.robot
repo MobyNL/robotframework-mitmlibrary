@@ -1,7 +1,7 @@
 *** Settings ***
-Library  ../../MitmLibrary.py
+Library  ../../MitmLibrary/MitmLibrary.py
 Library  Process
-# Library  Browser
+Library  Browser
 Library  RequestsLibrary
 Library  Collections
 
@@ -13,38 +13,21 @@ Test Teardown   Clear All Proxy Items
 *** Variables ***
 &{PROXY_DICT}  server=http://localhost:8080
 &{BROWSER_ARGS}  proxy=${PROXY_DICT}
+@{BROWSER_ARGS_LIST}  --ignore-certificate-errors
 &{REQUESTS_PROXY}  http=http://localhost:8080  http://host.name=http://localhost:8080
 &{DEFAULT_HEADERS}  Server=Werkzeug/2.2.2 Python/3.11.1  Date=Fri, 21 Jul 2023 16:27:23 GMT  Content-Type=text/html; charset=utf-8  Content-Length=41  Connection=close
+
 *** Test Cases ***
-# Do A Test
-#     [Setup]  Start Proxy  localhost  ${8080}  certificates_directory=./certificates
-#     New Browser  browser=chromium  headless=False  proxy=${PROXY_DICT}
-#     New Context
-#     New Page  https://www.hollandsnieuwe.nl/
-#     ${body}  Create Dictionary  id=300  type=MEMBER_GET_MEMBER  subType=MGM_MIJNHN
-#     ${body}  Create List  ${body}
-#     Add Custom Response    alias=features  url=cm/online/features  overwrite_body=${body}
-#     Reload
-#     Sleep  2s
-#     Add To Blocklist  hollandsnieuwe
-#     ${status}  Run keyword and return status  Go To  https://www.hollandsnieuwe.nl/
-#     Sleep  2s
-#     Add To Blocklist  google
-#     ${status}  Run keyword and return status  Go To  https://www.google.nl/
-#     Sleep  2s
-#     Should be True  not ${status}
-#     ${status}  Run keyword and return status  Go To  https://www.hollandsnieuwe.nl/
-#     Sleep  2s
-#     Should be True  not ${status}
-#     Log Blocked Urls
-#     Remove Url From Blocklist    hollandsnieuwe
-#     Go To  https://www.hollandsnieuwe.nl/
-#     Sleep  2s
-#     Log Blocked Urls
-#     Log Custom Response Items
-#     Remove Custom Response  alias=features
-#     Log Custom Response Items
-#     [Teardown]  Stop Proxy
+Block A Website
+    New Browser  browser=chromium  headless=False  proxy=${PROXY_DICT}
+    New Context
+    New Page  https://www.robotframework.org/
+    Go To  about:blank
+    Add To Blocklist  robotframework
+    ${status}  Run keyword and return status  Go To  https://www.robotframework.nl/
+    Should Not Be True  ${status}
+    Log Blocked Urls
+
 
 Custom Response With Post And Custom Body
     Create Session  alias=proxy  url=http://localhost:5000  proxies=${REQUESTS_PROXY}
@@ -89,7 +72,7 @@ Check POST Response Of test_post
 
 Setup Flask
     ${SUBPROCESS}  Start Process  flask  --app  ${CURDIR}/../resources/fake_website  run
-    Start Proxy  localhost  ${8080}  certificates_directory=./certificates
+    Start Proxy  localhost  ${8080}  certificates_directory=${CURDIR}/../resources/certificates
     Set Suite Variable  ${SUBPROCESS}
 
 Teardown Flask
