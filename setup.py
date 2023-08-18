@@ -1,7 +1,7 @@
 from distutils.core import setup
 setup(
-  name = 'MitmLibrary',
-  packages = ['MitmLibrary'],
+  name = 'robotframework-mitmlibrary',
+  packages = ['robotframework-mitmlibrary'],
   version = '0.1',
   license='MIT',
   description = 'Wrapper for mitmproxy with robotframework',
@@ -12,6 +12,7 @@ setup(
   keywords = ['robotframework', 'automation', 'testautomation','testing','mitm','maninthemiddle'],
   install_requires=[
           'mitm',
+          'robotframework',
       ],
   classifiers=[
     'Development Status :: 3 - Alpha',
