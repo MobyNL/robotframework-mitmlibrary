@@ -27,7 +27,7 @@ pip install robotframework-mitmlibrary
 1. Import the MITM Library in your Robot Framework test suite:
 ```robotframework
 *** Settings ***
-Library       MITMLibrary
+Library       MitmLibrary
 ```
 
 Use the available keywords to interact with the MITM proxy and manipulate network traffic as needed:
@@ -51,7 +51,8 @@ Examples where Mitm is useful:
 - When stub or mock behaviour is not sufficient for your testing needs.
 
 ### Mitm Certificates
-To test with SSL verification, you will need to set up the certificates related to
+To test with SSL verification, or use a browser without ignoring certificates,
+you will need to set up the certificates related to
 mitm. Follow the guide on the 
 [Mitm website](https://docs.mitmproxy.org/stable/concepts-certificates/)
 
