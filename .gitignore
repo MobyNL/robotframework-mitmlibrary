@@ -22,4 +22,4 @@ interactive_console_output.xml
 #python files
 *.egg-info
 *.tar.gz
-
+venv/*
