@@ -1,9 +1,10 @@
 *** Settings ***
-Library  MitmLibrary
 Library  Process
 Library  Browser
 Library  RequestsLibrary
 Library  Collections
+Library  MitmLibrary
+
 
 Suite Setup     Setup Flask
 Suite Teardown  Teardown Flask
