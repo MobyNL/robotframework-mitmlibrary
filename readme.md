@@ -30,7 +30,7 @@ pip install robotframework-mitmlibrary
 Library       MitmLibrary
 ```
 
-Use the available keywords to interact with the MITM proxy and manipulate network traffic as needed:
+2. Use the available keywords to interact with the MITM proxy and manipulate network traffic as needed:
 ```robotframework
 *** Settings ***
 Library       MitmLibrary
