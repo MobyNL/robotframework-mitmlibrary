@@ -40,7 +40,7 @@ class MitmLibrary(object):
 
     | Example Test
     |     Start Proxy    0.0.0.0    8080    /path/to/certificates    False
-    |     Add Response Delay    MyAlias    https://example.com/some/path    2.5
+    |     Add Response Delay    MyAlias    https://example.com/some/path    2s
     |     # Perform tests with manipulated network traffic
     |     Stop Proxy 
 
@@ -136,7 +136,7 @@ class MitmLibrary(object):
         - delay: The delay in seconds to be added for the specified URL.
 
         Example:
-        | Add Response Delay   MyAlias   https://example.com/some/path   2.5
+        | Add Response Delay   MyAlias   https://example.com/some/path   2s
 
         This keyword adds an entry to the list of response delay items using the provided alias, URL, and delay.
         """
