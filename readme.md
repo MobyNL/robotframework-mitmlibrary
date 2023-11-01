@@ -2,6 +2,9 @@
 
 ![Robot Framework Logo](https://robotframework.org/img/RF.svg)
 
+## Keyword
+[Keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
+
 ## Overview
 
 The Robot Framework MITM Library is a custom library for [Robot Framework](https://robotframework.org/) that enables seamless integration with the Python package [mitm](https://github.com/mitmproxy/mitmproxy). This library allows you to automate and test scenarios involving Man-in-the-Middle (MITM) proxy functionality within your Robot Framework test suites.
@@ -71,7 +74,7 @@ mitm. Follow the guide on the
 [Mitm website](https://docs.mitmproxy.org/stable/concepts-certificates/)
 
 ## Documentation
-For detailed information on the available keywords and usage examples, please refer to the Library Documentation.
+For detailed information on the available keywords and usage examples, please refer to the [Keyword Documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
 
 ## Contributing
 Contributions are welcome! If you encounter any issues, have suggestions for improvements, or would like to add new features, feel free to open an issue or submit a pull request.
