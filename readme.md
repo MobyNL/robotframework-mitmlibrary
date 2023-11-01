@@ -9,7 +9,7 @@ The Robot Framework MITM Library is a custom library for [Robot Framework](https
 ## Features
 
 - Interact with MITM proxy using Robot Framework keywords.
-- Capture and manipulate network traffic for testing purposes.
+- Manipulate network traffic for testing purposes.
 - Easily simulate different network conditions and responses.
 - Integrate MITM proxy capabilities into your existing Robot Framework tests.
 
@@ -30,12 +30,26 @@ Library       MitmLibrary
 
 Use the available keywords to interact with the MITM proxy and manipulate network traffic as needed:
 ```robotframework
+*** Settings ***
+Library       MitmLibrary
+
 *** Test Cases ***
-Test MITM Proxy
-    Start MITM Proxy   # Start the MITM proxy server
-    <!-- TODO: Add keywords -->
-    Stop MITM Proxy    # Stop the MITM proxy server
+Block and Delay Websites
+    Start Proxy
+
+    # Block requests to Robot Framework website
+    Add To Blocklist    robotframework.org
+
+    # Delay requests to Google
+    Add Response Delay  GoogleDelay   https://www.google.com  5  # Delay for 5 seconds
+
+    # Perform tests that involve network traffic manipulation
+    # ...
+
+    Stop Proxy
+
 ```
+
 
 ### Why use Mitm?
 Mitm allows manipulation on single browser instance, by using a proxy. It does not
@@ -44,9 +58,9 @@ once, also resulting in stubbed/mocked behaviour while manual testing.
 
 Examples where Mitm is useful: 
 - When running in parallel, if you do not want your other instances to be influenced. 
-- Manipulate the response of a request to see how the front end handles it for a integrated services that are always up.
-- When stubs or mocks are not available.
-- When stub or mock behaviour is not sufficient for your testing needs.
+- Manipulate the response of a request to see how the front end handles it
+- When stubs or mocks are not available or their behaviour is not sufficient for your testing needs.
+- When you want to have full control as tester, without dependency on a developer
 
 ### Mitm Certificates
 To test with SSL verification, or use a browser without ignoring certificates,
