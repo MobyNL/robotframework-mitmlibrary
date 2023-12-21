@@ -9,11 +9,11 @@ report.html
 __pycache__
 *.pyc
 
-#mitm files
-/certificates
-*.cer
-*.p12
-*.pem
+# #mitm files
+# /certificates
+# *.cer
+# *.p12
+# *.pem
 
 #vscode
 .vscode
