@@ -7,7 +7,7 @@
 
 ## Overview
 
-The Robot Framework MITM Library is a custom library for [Robot Framework](https://robotframework.org/) that enables seamless integration with the Python package [mitm](https://github.com/mitmproxy/mitmproxy). This library allows you to automate and test scenarios involving Man-in-the-Middle (MITM) proxy functionality within your Robot Framework test suites.
+The Robot Framework MITM Library is a custom library for [Robot Framework](https://robotframework.org/) that enables integration with the Python package [mitm](https://github.com/mitmproxy/mitmproxy). This library allows you to automate and test scenarios involving Man-in-the-Middle (MITM) proxy functionality within your Robot Framework test suites.
 
 ## Features
 
