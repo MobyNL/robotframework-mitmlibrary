@@ -4,6 +4,7 @@ Library  Browser
 Library  RequestsLibrary
 Library  Collections
 Library  MitmLibrary
+Library    Dialogs
 
 
 Suite Setup     Setup Flask
@@ -22,12 +23,11 @@ Test Teardown   Clear All Proxy Items
 Block A Website
     New Browser  browser=chromium  headless=False  proxy=${PROXY_DICT}
     New Context
-    New Page  https://www.robotframework.org/
-    Go To  about:blank
+    New Page  
     Add To Blocklist  robotframework
-    ${status}  Run keyword and return status  Go To  https://www.robotframework.nl/
-    Should Not Be True  ${status}
+    ${status}  Run keyword and return status  Go To  https://robotframework.org/
     Log Blocked Urls
+    Should Not Be True  ${status}
 
 
 Custom Response With Post And Custom Body
