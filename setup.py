@@ -13,7 +13,7 @@ setup(
         "Keyword documentation": "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html",
         "Slack Channel": "https://robotframework.slack.com/archives/C06M2J3J8AC",
     },
-    download_url="https://github.com/MobyNL/robotframework-mitmlibrary/archive/refs/tags/0.1.4.tar.gz",
+    download_url="https://github.com/MobyNL/robotframework-mitmlibrary/archive/refs/tags/0.1.5.tar.gz",
     keywords=[
         "robotframework",
         "automation",
