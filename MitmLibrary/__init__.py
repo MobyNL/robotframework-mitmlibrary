@@ -269,11 +269,11 @@ class MitmLibrary(object):
         self.request_logger.remove_custom_status(alias)
 
     @keyword
-    def turn_console_logging_off(self) -> None:
+    def turn_mitm_console_logging_off(self) -> None:
         """Turns the console logging off whenever a request/response is manipulated by MITM"""
         self.request_logger.set_console_logging(False)
 
     @keyword
-    def turn_console_logging_on(self) -> None:
+    def turn_mitm_console_logging_on(self) -> None:
         """Turns the console logging on whenever a request/response is manipulated by MITM."""
         self.request_logger.set_console_logging(True)
