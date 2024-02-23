@@ -23,6 +23,10 @@ class RequestLogger:
             for url in self.block_list:
                 if url in flow.request.pretty_host:
                     flow.kill()
+                    logger.info(
+                        f"Blocked request for {flow.request.pretty_url}",
+                        also_console=self.log_to_console,
+                    )
 
     def response(self, flow: http.HTTPFlow) -> None:
         self.custom_status_urls.extend(
@@ -49,7 +53,7 @@ class RequestLogger:
                     logger.info(
                         f"Delay response for {response_delay.url} for "
                         f"{response_delay.delay} seconds",
-                        also_console=True,
+                        also_console=self.log_to_console,
                     )
                     time_sleep(timestr_to_secs(response_delay.delay))
 
@@ -110,12 +114,13 @@ class RequestLogger:
         self, flow: http.HTTPFlow, custom_response
     ) -> None:
         logger.info(
-            f"Trying to update response for {custom_response.url}", also_console=True
+            f"Trying to update response for {custom_response.url}",
+            also_console=self.log_to_console,
         )
         if custom_response.headers:
             header_list = []
             for key, value in custom_response.headers.items():
-                logger.info(key, also_console=True)
+                logger.info(key, also_console=self.log_to_console)
                 header_list.append((bytes(key, "utf-8"), bytes(value, "utf-8")))
             headers = http.Headers(header_list)
         elif hasattr(flow, "headers"):
@@ -128,11 +133,12 @@ class RequestLogger:
             )
             logger.info(
                 f"Succesfully updated response for {custom_response.url}",
-                also_console=True,
+                also_console=self.log_to_console,
             )
         except:
             logger.info(
-                f"Updating response for {custom_response.url} failed", also_console=True
+                f"Updating response for {custom_response.url} failed",
+                also_console=self.log_to_console,
             )
 
     def add_custom_response_status(

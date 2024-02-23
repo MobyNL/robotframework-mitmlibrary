@@ -3,9 +3,8 @@ from typing import Optional
 
 from mitmproxy import options
 from mitmproxy.tools import dump
-
-from robot.api.deco import library, keyword, not_keyword
 from robot.api import logger
+from robot.api.deco import keyword, library, not_keyword
 
 from MitmLibrary.async_loop_thread import AsyncLoopThread
 from MitmLibrary.request_logger import RequestLogger
@@ -58,7 +57,7 @@ class MitmLibrary(object):
     """
 
     @not_keyword
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initializes the MitmLibrary instance.
 
@@ -70,13 +69,14 @@ class MitmLibrary(object):
         self.loop_handler.start()
 
     @keyword
-    async def start_proxy(
+    async def start_mitm_proxy(
         self,
-        listen_host="0.0.0.0",
-        listen_port=8080,
-        certificates_directory=None,
-        ssl_insecure=False,
-    ):
+        listen_host: str = "0.0.0.0",
+        listen_port: int = 8080,
+        certificates_directory: str = None,
+        ssl_insecure: bool = False,
+        log_to_console: bool = True,
+    ) -> None:
         """
         Starts a proxy at the given host and port.
 
@@ -86,10 +86,11 @@ class MitmLibrary(object):
         - ssl_insecure: If True, SSL verification is disabled.
 
         Example:
-        | Start Proxy    192.168.1.100    8888    /path/to/certificates    True
+        | Start Mitm Proxy    192.168.1.100    8888    /path/to/certificates    True
 
         See the 'Mitm Certificates' section in the documentation for more information.
         """
+        self.log_to_console = log_to_console
         opts = options.Options(
             listen_host=listen_host,
             listen_port=listen_port,
@@ -101,19 +102,19 @@ class MitmLibrary(object):
             with_termlog=False,
             with_dumper=False,
         )
-        self.request_logger = RequestLogger(self.proxy_master)
+        self.request_logger = RequestLogger(self.proxy_master, log_to_console)
         self.proxy_master.addons.add(self.request_logger)
         asyncio.run_coroutine_threadsafe(
             self.proxy_master.run(), self.loop_handler.loop
         )
 
     @keyword
-    async def stop_proxy(self):
+    async def stop_mitm_proxy(self) -> None:
         """Stops the proxy."""
         self.proxy_master.shutdown()
 
     @keyword
-    def add_to_blocklist(self, url):
+    def add_to_blocklist(self, url: str) -> None:
         """
         Adds a (partial) url to the list of blocked urls. If the url is found in any part
         of the pretty_url of the host, it will be blocked.
@@ -124,8 +125,13 @@ class MitmLibrary(object):
 
     @keyword
     def add_custom_response(
-        self, alias, url, overwrite_headers=None, overwrite_body=None, status_code=200
-    ):
+        self,
+        alias: str,
+        url: str,
+        overwrite_headers=None,
+        overwrite_body=None,
+        status_code: int = 200,
+    ) -> None:
         """
         Adds a custom response based on a (partial) url to the list of blocked urls.
         If the (partial) url is found in any part of the pretty_url of the host, its response will be changed.
@@ -141,7 +147,7 @@ class MitmLibrary(object):
         )
 
     @keyword
-    def add_response_delay(self, alias, url, delay) -> None:
+    def add_response_delay(self, alias: str, url: str, delay: str) -> None:
         """Add a response delay entry using Robot Framework syntax.
 
         - alias: The alias for the response delay entry.
@@ -156,7 +162,9 @@ class MitmLibrary(object):
         self.request_logger.add_response_delay_item(alias, url, delay)
 
     @keyword
-    def add_custom_response_status_code(self, alias, url, status_code=200):
+    def add_custom_response_status_code(
+        self, alias: str, url: str, status_code: int = 200
+    ) -> None:
         """
         Adds a custom response status code to each request where the URL contains the (partial) URL of the custom status code.
 
@@ -177,13 +185,13 @@ class MitmLibrary(object):
         self.request_logger.add_custom_response_item(alias, url, status_code)
 
     @keyword
-    def clear_all_proxy_items(self):
+    def clear_all_proxy_items(self) -> None:
         """Removes all custom responses, blocked urls, etc. Basically, this acts as
         restarting the proxy, without actually restarting the proxy."""
         self.request_logger.clear_all_proxy_items()
 
     @keyword
-    def log_blocked_urls(self):
+    def log_blocked_urls(self) -> None:
         """Logs the current list of items that will result in a block, if the url is
         found in the pretty_url of a host."""
         block_items = ", ".join(self.request_logger.block_list)
@@ -193,7 +201,7 @@ class MitmLibrary(object):
         )
 
     @keyword
-    def log_delayed_responses(self):
+    def log_delayed_responses(self) -> None:
         """
         Logs the URLs for which custom response delays are configured.
 
@@ -216,7 +224,7 @@ class MitmLibrary(object):
         )
 
     @keyword
-    def log_custom_response_items(self):
+    def log_custom_response_items(self) -> None:
         """Logs the current list of urls that will result in a custom response, if the
         url is found in the pretty_url of a host.
 
@@ -232,7 +240,7 @@ class MitmLibrary(object):
             logger.info(f"{response}")
 
     @keyword
-    def log_custom_status_items(self):
+    def log_custom_status_items(self) -> None:
         """Logs the current list of urls that will result in a custom response, if the
         url is found in the pretty_url of a host.
 
@@ -246,16 +254,26 @@ class MitmLibrary(object):
             logger.info(f"{response}")
 
     @keyword
-    def remove_url_from_blocklist(self, url):
+    def remove_url_from_blocklist(self, url: str) -> None:
         """Removes a custom (partial) url from the list."""
         self.request_logger.remove_from_blocklist(url)
 
     @keyword
-    def remove_custom_response(self, alias):
+    def remove_custom_response(self, alias: str) -> None:
         """Removes a custom response from the list, based on it's alias."""
         self.request_logger.remove_custom_response_item(alias)
 
     @keyword
-    def remove_custom_status_code(self, alias):
+    def remove_custom_status_code(self, alias: str) -> None:
         """Removes a custom status_code from the list."""
         self.request_logger.remove_custom_status(alias)
+
+    @keyword
+    def turn_mitm_console_logging_off(self) -> None:
+        """Turns the console logging off whenever a request/response is manipulated by MITM"""
+        self.request_logger.set_console_logging(False)
+
+    @keyword
+    def turn_mitm_console_logging_on(self) -> None:
+        """Turns the console logging on whenever a request/response is manipulated by MITM."""
+        self.request_logger.set_console_logging(True)
