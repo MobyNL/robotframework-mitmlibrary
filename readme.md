@@ -9,6 +9,8 @@
 
 The Robot Framework MITM Library is a custom library for [Robot Framework](https://robotframework.org/) that enables seamless integration with the Python package [mitm](https://github.com/mitmproxy/mitmproxy). This library allows you to automate and test scenarios involving Man-in-the-Middle (MITM) proxy functionality within your Robot Framework test suites.
 
+If you need help, have suggestions or want to discuss anything, feel free to contact through the [slack channel](https://robotframework.slack.com/archives/C06M2J3J8AC).
+
 ## Features
 
 - Interact with MITM proxy using Robot Framework keywords.
@@ -40,7 +42,7 @@ Library       MitmLibrary
 
 *** Test Cases ***
 Block and Delay Websites
-    Start Proxy
+    Start Mitm Proxy
 
     # Block requests to Robot Framework website
     Add To Blocklist    robotframework.org
@@ -51,7 +53,7 @@ Block and Delay Websites
     # Perform tests that involve network traffic manipulation
     # ...
 
-    Stop Proxy
+    Stop Mitm Proxy
 
 ```
 
