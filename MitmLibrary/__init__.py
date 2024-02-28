@@ -182,7 +182,7 @@ class MitmLibrary(object):
 
         For more information on HTTP status codes, visit: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
         """
-        self.request_logger.add_custom_response_item(alias, url, status_code)
+        self.request_logger.add_custom_response_status(alias, url, status_code)
 
     @keyword
     def clear_all_proxy_items(self) -> None:
@@ -245,13 +245,11 @@ class MitmLibrary(object):
         url is found in the pretty_url of a host.
 
         Will also log the custom response items themselves."""
-        custom_responses = ", ".join(self.request_logger.custom_response_status)
-        logger.info(
-            f"The following custom responses are currently loaded: "
-            f"{custom_responses}."
-        )
-        for response in self.request_logger.custom_response_status:
-            logger.info(f"{response}")
+        logger.info(f"The following custom responses are currently loaded: ")
+        for custom_response in self.request_logger.custom_response_status:
+            logger.info(
+                f"Alias {custom_response.alias}: Url {custom_response.url} - Status code: {custom_response.status_code}."
+            )
 
     @keyword
     def remove_url_from_blocklist(self, url: str) -> None:
