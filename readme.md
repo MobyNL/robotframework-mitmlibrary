@@ -1,6 +1,6 @@
 # Robot Framework MITM Library
 
-![Robot Framework Logo](![MitmLibrary Icon](https://github.com/MobyNL/robotframework-mitmlibrary/blob/main/MitmLibrary.png))
+![MitmLibrary Icon](https://github.com/MobyNL/robotframework-mitmlibrary/blob/main/MitmLibrary.png)
 
 ## Keyword
 [Keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
