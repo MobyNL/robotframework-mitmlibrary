@@ -44,6 +44,10 @@ class RequestLogger:
                     self.update_request_with_custom_response(flow, custom_response)
         if any(url in flow.request.pretty_url for url in self.custom_status_urls):
             for custom_status in self.custom_response_status:
+                logger.info(
+                    f"Updating status code for {custom_status.url} to {custom_status.status_code}",
+                    also_console=self.log_to_console,
+                )
                 if custom_status.url in flow.request.pretty_url:
                     flow.response.status_code = custom_status.status_code
 
@@ -144,7 +148,7 @@ class RequestLogger:
     def add_custom_response_status(
         self, alias: str, url: str, status_code: int
     ) -> None:
-        self.custom_response_list.append(
+        self.custom_response_status.append(
             DotDict({"alias": alias, "url": url, "status_code": status_code})
         )
 

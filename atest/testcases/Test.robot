@@ -35,13 +35,21 @@ Block A Website
     Log Blocked Urls
     Should Not Be True    ${status}
 
+Custom Response With Post And Custom Status Code
+    Create Session    alias=proxy    url=http://localhost:5000    proxies=${REQUESTS_PROXY}
+    Check POST Response Of test_post    <number_size>smaller than 2</number_size>    ${200}
+    Add Custom Response Status Code    alias=number_post    url=test_post    status_code=${404}
+    Log Custom Status Items
+    Check POST Response Of test_post    <number_size>smaller than 2</number_size>    ${404}
+
 Custom Response With Post And Custom Body
     Create Session    alias=proxy    url=http://localhost:5000    proxies=${REQUESTS_PROXY}
     Check POST Response Of test_post    <number_size>smaller than 2</number_size>    ${200}
     Add Custom Response    alias=number_post    url=test_post    overwrite_body=<number_size>not_found</number_size>
+    Log Custom Response Items
     Check POST Response Of test_post    <number_size>not_found</number_size>    ${200}
 
-Custom Response With Post And Custom StatusCode
+Custom Response With Post And Custom StatusCode Using Add Custom Response
     Create Session    alias=proxy    url=http://localhost:5000    proxies=${REQUESTS_PROXY}
     Check POST Response Of test_post    <number_size>smaller than 2</number_size>    ${200}
     Add Custom Response    alias=number_post    url=test_post    status_code=404
