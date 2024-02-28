@@ -1,9 +1,9 @@
 #robot files
 log.html
 output.xml
-*.png
 playwright-log.txt
 report.html
+Logs/
 
 #pycache
 __pycache__
