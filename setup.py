@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name="robotframework-mitmlibrary",
     packages=["MitmLibrary"],
-    version="0.1.7",
+    version="0.1.8",
     license="MIT",
     description="Wrapper for mitmproxy with Robot Framework",
     author="Mark Moberts",
@@ -13,7 +13,7 @@ setup(
         "Keyword documentation": "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html",
         "Slack Channel": "https://robotframework.slack.com/archives/C06M2J3J8AC",
     },
-    download_url="https://github.com/MobyNL/robotframework-mitmlibrary/archive/refs/tags/0.1.5.tar.gz",
+    download_url="https://github.com/MobyNL/robotframework-mitmlibrary/archive/refs/tags/0.1.8.tar.gz",
     keywords=[
         "robotframework",
         "automation",
@@ -41,7 +41,7 @@ setup(
     long_description="""
 # Robot Framework MITM Library
 
-![Mitm Library Logo](https://raw.githubusercontent.com/MobyNL/robotframework-mitmlibrary/refs/heads/main/MITMLibrary_small.png)
+[![MITMLibrary](https://raw.githubusercontent.com/MobyNL/robotframework-mitmlibrary/main/MITMLibrary_small.png)](https://github.com/MobyNL/robotframework-mitmlibrary)
 
 ## Keyword Documentation
 
