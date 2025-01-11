@@ -82,7 +82,7 @@ Delayed Response With Post
     Check POST Response Of test_post    <number_size>smaller than 2</number_size>    ${200}
 
 Turn Logging Off And On
-    New Browser    browser=chromium    headless=False    proxy=${PROXY_DICT}
+    New Browser    browser=chromium    headless=True    proxy=${PROXY_DICT}
     New Context
     New Page
     Turn Mitm Console Logging Off
