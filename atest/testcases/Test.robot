@@ -27,7 +27,7 @@ Test Teardown       Clear All Proxy Items
 
 *** Test Cases ***
 Block A Website
-    New Browser    browser=chromium    headless=False    proxy=${PROXY_DICT}
+    New Browser    browser=chromium    headless=True    proxy=${PROXY_DICT}
     New Context
     New Page
     Add To Blocklist    robotframework
