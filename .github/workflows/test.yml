@@ -27,7 +27,7 @@ jobs:
           poetry install --with dev
 
       - name: Run unit tests
-        run: pytest
+        run: poetry run pytest
 
       - name: Run acceptance tests
-        run: robot atest/testcases
+        run: poetry run robot atest/testcases
