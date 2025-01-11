@@ -23,3 +23,6 @@ interactive_console_output.xml
 *.egg-info
 *.tar.gz
 venv/*
+
+# other
+pypi_token.txt

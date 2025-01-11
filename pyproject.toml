@@ -1,2 +1,31 @@
 [tool.pylint.messages_control]
 max-line-length = 140
+
+[tool.poetry]
+name = "robotframework-mitmlibrary"
+version = "0.1.7"
+description = "A Robot Framework library for managing and manipulating HTTP requests and responses using a man-in-the-middle proxy approach. It allows blocking requests, customizing responses, adding delays, and more."
+authors = ["Mark <markmoberts@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/MobyNL/robotframework-mitmlibrary"
+repository = "https://github.com/MobyNL/robotframework-mitmlibrary"
+documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+mitmproxy = "^11.0.2"
+robotframework = "^7.1.1"
+wheel = "^0.45.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
+coverage = "^7.6.10"
+robotframework-browser = "^19.1.2"
+robotframework-requests = "^0.9.7"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
