@@ -11,6 +11,7 @@ readme = "README.md"
 homepage = "https://github.com/MobyNL/robotframework-mitmlibrary"
 repository = "https://github.com/MobyNL/robotframework-mitmlibrary"
 documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
+packages = [{ include = "MitmLibrary" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"

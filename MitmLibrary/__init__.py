@@ -1,5 +1,17 @@
+"""
+This file defines the MitmLibrary class, the main entry point for interacting with the MitmProxy library within Robot Framework.
+
+The MitmLibrary class provides a suite-scoped interface for:
+
+* Starting and stopping the MitmProxy server.
+* Configuring proxy behavior (e.g., blocking requests, modifying responses).
+* Controlling console logging.
+
+This library allows you to intercept and manipulate network traffic during your Robot Framework tests, enabling you to simulate various network conditions and test your applications in a more realistic and controlled environment.
+"""
+
 import asyncio
-from typing import Optional
+from typing import Dict, Optional
 
 from mitmproxy import options
 from mitmproxy.tools import dump
@@ -63,9 +75,9 @@ class MitmLibrary(object):
 
         This constructor initializes the proxy_master and request_logger instances used for managing the proxy server.
         """
-        self.proxy_master = ""
-        self.request_logger = ""
-        self.loop_handler = AsyncLoopThread()
+        self.proxy_master: dump.DumpMaster = ""
+        self.request_logger: RequestLogger = ""
+        self.loop_handler: AsyncLoopThread = AsyncLoopThread()
         self.loop_handler.start()
 
     @keyword
@@ -128,8 +140,8 @@ class MitmLibrary(object):
         self,
         alias: str,
         url: str,
-        overwrite_headers=None,
-        overwrite_body=None,
+        overwrite_headers: Optional[Dict[str, str]] = None,
+        overwrite_body: Optional[str] = None,
         status_code: int = 200,
     ) -> None:
         """
@@ -233,8 +245,7 @@ class MitmLibrary(object):
             [response.url for response in self.request_logger.custom_response_list]
         )
         logger.info(
-            f"The following custom responses are currently loaded: "
-            f"{custom_responses}."
+            f"The following custom responses are currently loaded: {custom_responses}."
         )
         for response in self.request_logger.custom_response_list:
             logger.info(f"{response}")
@@ -245,7 +256,7 @@ class MitmLibrary(object):
         url is found in the pretty_url of a host.
 
         Will also log the custom response items themselves."""
-        logger.info(f"The following custom responses are currently loaded: ")
+        logger.info("The following custom responses are currently loaded: ")
         for custom_response in self.request_logger.custom_response_status:
             logger.info(
                 f"Alias {custom_response.alias}: Url {custom_response.url} - Status code: {custom_response.status_code}."
