@@ -1,15 +1,15 @@
 name: Test
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    workflow_run:
+      workflows: ["Build"]
+      types:
+        - completed
+  
 
 jobs:
   test:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
