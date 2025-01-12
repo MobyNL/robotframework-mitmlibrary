@@ -1,6 +1,5 @@
 *** Settings ***
 Library             Collections
-Library             Dialogs
 Library             Process
 Library             Browser
 Library             RequestsLibrary

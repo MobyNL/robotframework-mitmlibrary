@@ -23,7 +23,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -43,7 +43,6 @@ jobs:
       matrix:
         python-version: [3.8, 3.9, 3.10, 3.11, 3.12, 3.13]
 
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -51,7 +50,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -71,5 +70,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: ./Logs
-          name: robot-test-results
+          name: robot-test-results-${{ matrix.python-version }}
           retention-days: 3
