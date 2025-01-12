@@ -65,4 +65,11 @@ jobs:
         run: poetry run rfbrowser init
 
       - name: Run acceptance tests
-        run: poetry run robot atest/testcases
+        run: poetry run robot -d Logs atest/testcases
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./Logs
+          name: robot-test-results
+          retention-days: 3
