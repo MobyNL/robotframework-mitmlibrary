@@ -14,7 +14,7 @@ documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibrary
 packages = [{ include = "MitmLibrary" }]
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 mitmproxy = "^11.0.2"
 robotframework = "^7.1.1"
 wheel = "^0.45.1"
@@ -26,6 +26,7 @@ pytest-cov = "^6.0.0"
 coverage = "^7.6.10"
 robotframework-browser = "^19.1.2"
 robotframework-requests = "^0.9.7"
+setuptools = "^75.8.0"
 
 [build-system]
 requires = ["poetry-core"]
