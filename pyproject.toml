@@ -3,7 +3,7 @@ max-line-length = 140
 
 [tool.poetry]
 name = "robotframework-mitmlibrary"
-version = "0.1.9"
+version = "0.2.0"
 description = "A Robot Framework library for managing and manipulating HTTP requests and responses using a man-in-the-middle proxy approach. It allows blocking requests, customizing responses, adding delays, and more."
 authors = ["Mark <markmoberts@gmail.com>"]
 license = "MIT"
@@ -14,8 +14,8 @@ documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibrary
 packages = [{ include = "MitmLibrary" }]
 
 [tool.poetry.dependencies]
-python = "^3.11"
-mitmproxy = "^11.0.2"
+python = "^3.12"
+mitmproxy = "^11.1.2"
 robotframework = "^7.1.1"
 wheel = "^0.45.1"
 
