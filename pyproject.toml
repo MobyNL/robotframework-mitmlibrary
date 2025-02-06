@@ -3,7 +3,7 @@ max-line-length = 140
 
 [tool.poetry]
 name = "robotframework-mitmlibrary"
-version = "0.2.0"
+version = "0.2.1"
 description = "A Robot Framework library for managing and manipulating HTTP requests and responses using a man-in-the-middle proxy approach. It allows blocking requests, customizing responses, adding delays, and more."
 authors = ["Mark <markmoberts@gmail.com>"]
 license = "MIT"
