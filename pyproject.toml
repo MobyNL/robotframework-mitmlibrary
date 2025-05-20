@@ -15,7 +15,7 @@ packages = [{ include = "MitmLibrary" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
-mitmproxy = "^11.1.2"
+mitmproxy = "^12.0.1"
 robotframework = "^7.1.1"
 wheel = "^0.45.1"
 
@@ -26,7 +26,7 @@ pytest-cov = "^6.0.0"
 coverage = "^7.6.10"
 robotframework-browser = "^19.1.2"
 robotframework-requests = "^0.9.7"
-setuptools = "^75.8.0"
+setuptools = "^78.1.1"
 
 [build-system]
 requires = ["poetry-core"]
