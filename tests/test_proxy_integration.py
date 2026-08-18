@@ -9,7 +9,10 @@ import logging
 import shutil
 import socket
 import tempfile
+import threading
+import time
 import unittest
+import urllib.request
 
 from mitmproxy import options
 
@@ -113,6 +116,58 @@ class TestProxyIntegration(unittest.TestCase):
         """Pins the reason for the test above, so a revert is reported as itself."""
         self.library.start_mitm_proxy(listen_port=self.port)
         self.assertIsNone(self.library.proxy_master.addons.get("errorcheck"))
+
+    def test_traffic_is_recorded_across_the_proxy_thread(self):
+        """Recording crosses a thread boundary, which a mocked proxy cannot exercise.
+
+        The proxy records on its own event loop thread while the keywords read from this
+        one, so only a real request through a real proxy proves the two agree.
+        """
+        self.library.start_mitm_proxy(listen_port=self.port, record=True)
+        address = self.library.get_proxy_address()
+
+        # A request the proxy cannot forward: the point is that it was *seen*, and a
+        # failed request has to be recorded too, or a blocked call could never be
+        # asserted on.
+        self._request_through_proxy(address.port, "http://127.0.0.1:1/recorded")
+
+        found = self.library.wait_until_request_is_made("/recorded", timeout="10s")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].method, "GET")
+        self.assertIn("/recorded", found[0].url)
+        self.library.request_should_have_been_made("/recorded")
+        self.library.request_should_not_have_been_made("/never-asked-for")
+
+    def test_waiting_returns_when_the_request_arrives(self):
+        """The wait is woken by the proxy thread, not by a poll on this one."""
+        self.library.start_mitm_proxy(listen_port=self.port, record=True)
+        address = self.library.get_proxy_address()
+
+        timer = threading.Timer(
+            0.3,
+            self._request_through_proxy,
+            (address.port, "http://127.0.0.1:1/later"),
+        )
+        timer.start()
+        self.addCleanup(timer.cancel)
+
+        started = time.monotonic()
+        found = self.library.wait_until_request_is_made("/later", timeout="15s")
+        self.assertEqual(len(found), 1)
+        self.assertLess(time.monotonic() - started, 10)
+
+    @staticmethod
+    def _request_through_proxy(proxy_port, url):
+        """Sends one request through the proxy, ignoring how it turns out."""
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler(
+                {"http": f"http://127.0.0.1:{proxy_port}"}
+            )
+        )
+        try:
+            opener.open(url, timeout=5).close()
+        except Exception:  # noqa: BLE001 - the answer does not matter, only the record
+            pass
 
 
 if __name__ == "__main__":

@@ -78,6 +78,28 @@ All matching rules are applied. A rule that blocks a request ends it and nothing
 runs; otherwise `Set Response` runs before rules that change part of a response, which run
 before delays, so combinations behave predictably rather than overwriting each other.
 
+### Recording
+
+The proxy can also remember what went through it, so a suite can assert on what the
+application under test actually sent rather than only on what came back:
+
+```robotframework
+Start Mitm Proxy    record=True
+# ... drive the application ...
+Request Should Have Been Made       /api/orders    method=POST
+Request Should Not Have Been Made   /api/telemetry
+${requests}    Get Recorded Requests    /api/orders
+Should Be Equal    ${requests}[0][request_body]    {"id": 1}
+```
+
+`Wait Until Request Is Made` covers traffic a test does not trigger directly, such as a
+call a page makes after it has loaded.
+
+Recording is off by default, and what it keeps is capped both in number of requests and in
+bytes per body, so a long run does not grow without limit. When the request cap is reached
+the oldest is dropped, and assertion failures say so rather than presenting a shortened
+recording as if it were complete.
+
 By default the proxy listens on `127.0.0.1:8080`. Pass a different host explicitly if the
 proxy must be reachable from another machine or container:
 

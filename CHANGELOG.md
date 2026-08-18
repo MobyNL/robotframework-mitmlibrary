@@ -63,6 +63,17 @@ Two behaviour changes come with it:
   - `Redirect Requests To Host` sends it to a different host, keeping the path and
     query, and updates the `Host` header so the receiving server is addressed by a name
     it answers to.
+- Traffic can be recorded and asserted on, which the library could not do at all before:
+  it could change what came back but never report what the application actually sent.
+  `Start Recording`, or `record=True` on `Start Mitm Proxy`, turns it on, and
+  `Get Recorded Requests`, `Get Request Count`, `Request Should Have Been Made`,
+  `Request Should Not Have Been Made` and `Wait Until Request Is Made` ask about it.
+  Recording is off by default and capped in two directions - how many requests are kept
+  and how many bytes of each body - so a long run does not quietly grow without limit.
+  When the first cap is reached the oldest request is dropped and the number dropped is
+  reported in assertion failures rather than hidden, so an assertion against a shortened
+  recording cannot look complete. Requests that failed are recorded too, so a blocked
+  call can be asserted on.
 - `Get Proxy Rules` returns the loaded rules in the order they are applied.
 - Blocking rules have an alias, like every other rule, so they are removed the same way.
 - Rules survive a restart of the proxy: the registry outlives it, and only the addon

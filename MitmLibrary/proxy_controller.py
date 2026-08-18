@@ -166,6 +166,29 @@ class ProxyController:
             f"Could not start the proxy on {listen_host}:{listen_port}: {reported}"
         )
 
+    def add_addon(self, addon: Any) -> None:
+        """Registers an addon with the running proxy.
+
+        Used for addons a suite turns on after the proxy started, such as the recorder.
+        Anything the proxy must never miss belongs in the factory passed to `start`.
+        """
+        if self.master is None:
+            raise RuntimeError("No proxy is running.")
+        self.master.addons.add(addon)
+
+    def remove_addon(self, addon: Any) -> None:
+        """Removes an addon from the running proxy, if it is still registered.
+
+        The proxy may already have stopped, taking its addons with it, which is not a
+        problem worth failing a keyword over.
+        """
+        if self.master is None:
+            return
+        try:
+            self.master.addons.remove(addon)
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.info(f"The addon was already gone: {error}")
+
     def listen_addresses(
         self, proxy_master: Optional[dump.DumpMaster] = None
     ) -> List[Tuple[Any, ...]]:
