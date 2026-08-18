@@ -46,8 +46,9 @@ jobs:
           committed="$(mktemp)"
           cp docs/MitmLibraryKeywords.html "$committed"
           poetry run python -m robot.libdoc MitmLibrary docs/MitmLibraryKeywords.html
-          # libdoc stamps a generation time into the file, so compare without it.
-          strip='s/"generated": "[^"]*"/"generated": ""/'
+          # libdoc stamps a generation time and the absolute path of the source file
+          # into the output, both of which differ per machine. Compare without them.
+          strip='s/"generated": "[^"]*"/"generated": ""/g; s#"source": "[^"]*"#"source": ""#g'
           if ! diff -q <(sed -E "$strip" "$committed") \
                        <(sed -E "$strip" docs/MitmLibraryKeywords.html) >/dev/null; then
             echo "docs/MitmLibraryKeywords.html is stale. Regenerate and commit it." >&2
