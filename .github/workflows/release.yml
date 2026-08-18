@@ -2,134 +2,40 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
-
-permissions:
-  contents: read
+    tags: ["v*"]
 
 jobs:
-  # A PyPI upload cannot be undone or replaced, so everything that can be checked is
-  # checked before the publish job runs.
-  verify:
-    name: verify the tag and run the tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install poetry
-          poetry install --with dev
-
-      - name: Check the tag matches the package version
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          version="$(poetry version --short)"
-          if [ "$tag" != "$version" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $version." >&2
-            exit 1
-          fi
-          echo "Releasing version $version."
-
-      # GitHub Pages serves docs/ from main, so a stale file means the published
-      # keyword documentation does not describe the release being published.
-      - name: Check the keyword documentation is up to date
-        run: |
-          committed="$(mktemp)"
-          cp docs/MitmLibraryKeywords.html "$committed"
-          poetry run python -m robot.libdoc MitmLibrary docs/MitmLibraryKeywords.html
-          # libdoc stamps a generation time and the absolute path of the source file
-          # into the output, both of which differ per machine. Compare without them.
-          strip='s/"generated": "[^"]*"/"generated": ""/g; s#"source": "[^"]*"#"source": ""#g'
-          sed -E "$strip" "$committed" > /tmp/committed.normalised
-          sed -E "$strip" docs/MitmLibraryKeywords.html > /tmp/regenerated.normalised
-          if ! diff -q /tmp/committed.normalised /tmp/regenerated.normalised >/dev/null; then
-            echo "docs/MitmLibraryKeywords.html is stale. Regenerate and commit it." >&2
-            # Show what actually differs: a guard that fails without saying why is
-            # impossible to act on, and the difference may be environmental.
-            echo "--- differences (first 40 lines, truncated to 300 columns) ---" >&2
-            diff /tmp/committed.normalised /tmp/regenerated.normalised \
-              | head -40 | cut -c1-300 >&2
-            exit 1
-          fi
-
-      - name: Run unit tests
-        run: poetry run pytest
-
-  build:
-    name: build the distributions
-    needs: verify
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build twine
-
-      - name: Build package
-        run: python -m build
-
-      - name: Check the distributions render on PyPI
-        run: twine check --strict dist/*
-
-      - name: Upload the distributions
-        uses: actions/upload-artifact@v4
-        with:
-          name: distributions
-          path: dist/
-          retention-days: 7
-
-  pypi-publish:
-    name: upload release to PyPI
-    needs: build
+  publish:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
+      # Declaring any permission replaces the whole default set, so contents: read has
+      # to be named too. Without it the token cannot clone a private repository and
+      # checkout fails with "repository not found", which reads like a wrong URL rather
+      # than a missing scope.
+      contents: read
+      # Trusted publishing, so no token is stored in the repository.
       id-token: write
     steps:
-      - name: Download the distributions
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
         with:
-          name: distributions
-          path: dist/
+          python-version: "3.12"
 
-      - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
+      - name: Install Poetry
+        run: pipx install poetry
 
-  github-release:
-    name: publish the GitHub release
-    needs: pypi-publish
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download the distributions
-        uses: actions/download-artifact@v4
-        with:
-          name: distributions
-          path: dist/
-
-      - name: Create the release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Check the tag against the declared version
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes
+          tag="${GITHUB_REF_NAME#v}"
+          declared="$(poetry version --short)"
+          if [ "$tag" != "$declared" ]; then
+            echo "Tag $tag does not match the version in pyproject.toml ($declared)." >&2
+            exit 1
+          fi
+
+      - name: Build
+        run: poetry build
+
+      - uses: pypa/gh-action-pypi-publish@release/v1

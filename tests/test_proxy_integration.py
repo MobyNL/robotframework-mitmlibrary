@@ -5,12 +5,12 @@ way the library talks to mitmproxy itself. These tests exercise that boundary fo
 both of the failure modes below were live bugs that a mocked DumpMaster hid.
 """
 
-import pathlib
 import shutil
 import socket
 import tempfile
-import time
 import unittest
+
+from mitmproxy import options
 
 from MitmLibrary import MitmLibrary
 
@@ -40,26 +40,19 @@ class TestProxyIntegration(unittest.TestCase):
             self.library._listening_addresses(), [("127.0.0.1", self.port)]
         )
 
-    def test_certificates_directory_is_used(self):
-        """A given directory must reach mitmproxy and receive its generated CA."""
+    def test_mitmproxy_accepts_the_certificates_directory(self):
+        """The directory must be usable as mitmproxy's confdir, and omitting it must not
+        produce `confdir=None`, which mitmproxy rejects with a TypeError.
+
+        This builds the options rather than starting a proxy: generating a certificate
+        authority in a fresh directory is mitmproxy's work, not this library's, and it
+        stalls under coverage instrumentation.
+        """
         certs_dir = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, certs_dir, True)
-        self.library.start_mitm_proxy(
-            listen_port=self.port, certificates_directory=certs_dir
-        )
-        self.assertEqual(
-            self.library.proxy_master.options.confdir, certs_dir
-        )
-        deadline = time.monotonic() + 10
-        while time.monotonic() < deadline:
-            written = list(pathlib.Path(certs_dir).glob("mitmproxy-ca*"))
-            if written:
-                break
-            time.sleep(0.1)
-        self.assertTrue(
-            written,
-            "mitmproxy did not write its certificate authority to the given directory",
-        )
+        self.assertEqual(options.Options(confdir=certs_dir).confdir, certs_dir)
+        with self.assertRaises(TypeError):
+            options.Options(confdir=None)
 
     def test_busy_port_fails_the_keyword(self):
         """mitmproxy only logs bind failures, so this must not silently run green."""

@@ -17,7 +17,7 @@ and create realistic testing scenarios within your Robot Framework tests.
 """
 
 import asyncio
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 
 from mitmproxy import http
 from mitmproxy.tools import dump
@@ -92,7 +92,7 @@ class RequestLogger:
                 self.update_request_with_custom_response(flow, custom_response)
 
         for custom_status in self.custom_response_status:
-            if custom_status.url in pretty_url:
+            if custom_status.url in pretty_url and flow.response is not None:
                 logger.info(
                     f"Updating status code for {custom_status.url} to {custom_status.status_code}",
                     also_console=self.log_to_console,
@@ -171,8 +171,8 @@ class RequestLogger:
         self,
         alias: str,
         url: str,
-        overwrite_headers=None,
-        overwrite_body=None,
+        overwrite_headers: Optional[Dict[str, str]] = None,
+        overwrite_body: Optional[str] = None,
         status_code: int = 200,
     ) -> None:
         """
@@ -261,11 +261,11 @@ class RequestLogger:
         return http.Headers()
 
     @staticmethod
-    def _resolve_content(flow: http.HTTPFlow, custom_response: DotDict):
+    def _resolve_content(flow: http.HTTPFlow, custom_response: DotDict) -> Union[str, bytes]:
         """Returns the body to use, keeping the original one when none is given."""
         if custom_response.body is not None:
             return safe_str(custom_response.body)
-        if flow.response is not None:
+        if flow.response is not None and flow.response.content is not None:
             return flow.response.content
         return b""
 

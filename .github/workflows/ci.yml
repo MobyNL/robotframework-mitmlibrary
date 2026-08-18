@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Nightly, so the unpinned job below reports a break in a dependency before a release does.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-unit-test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # mitmproxy requires 3.12, so the floor is higher than in the sibling libraries.
+        python-version: ["3.12", "3.13", "3.14"]
+        # The unit tests start a real proxy, which is worth exercising on every platform
+        # the library claims to support. The acceptance suite cannot run on all of them;
+        # see the acceptance-test job.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install
+        run: poetry install
+      - name: Ruff
+        run: poetry run ruff check .
+      - name: Robocop
+        run: poetry run robocop check atest
+      - name: Mypy
+        run: poetry run mypy
+      - name: Unit tests
+        run: poetry run pytest
+
+  unit-test-robot-framework-range:
+    # The lock file pins one Robot Framework. These are the ends of the declared range,
+    # installed explicitly, so the constraint in pyproject.toml is a tested claim.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        robotframework:
+          # The floor of the declared range.
+          - "7.1.1"
+          # The last 7.2 and 7.3, either side of the changes to argument conversion.
+          - "7.2.2"
+          - "7.3.2"
+          # The newest. Covered by the jobs installing from the lock too, but only for as
+          # long as the lock happens to point at it.
+          - "7.4.2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install with pinned Robot Framework
+        run: |
+          python -m pip install --upgrade pip
+          pip install . pytest pytest-cov "robotframework==${{ matrix.robotframework }}"
+      - name: Report the resolved versions
+        run: pip list | grep -E "robotframework|mitmproxy"
+      - name: Unit tests
+        # The integration tests start a real proxy, which is the part most likely to
+        # break on a Robot Framework the lock never sees.
+        run: pytest tests -p no:cacheprovider --no-cov
+      - name: Import the library and generate its documentation
+        # Libdoc reads every signature and docstring, so it fails on an annotation the
+        # version cannot convert or a documentation construct it cannot parse - neither
+        # of which the unit tests would notice.
+        run: python -m robot.libdoc MitmLibrary libdoc-check.html
+
+  unit-test-latest-unpinned:
+    # The counterweight to the upper bounds: installs past them and reports, without
+    # failing the build. Nightly only, since a break here is not the contributor's doing.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - name: Install, then upgrade past the declared upper bounds
+        # --no-deps on the upgrade: the point is to install a version pyproject.toml
+        # excludes, and without it pip re-resolves and pulls the capped version back.
+        run: |
+          python -m pip install --upgrade pip
+          pip install . pytest pytest-cov
+          pip install --upgrade --no-deps robotframework mitmproxy
+      - name: Report the resolved versions
+        # Read this first when the job is red: it names the version that broke.
+        run: pip list | grep -E "robotframework|mitmproxy"
+      - name: Unit tests
+        run: pytest tests -p no:cacheprovider --no-cov
+      - name: Import the library and generate its documentation
+        run: python -m robot.libdoc MitmLibrary libdoc-check.html
+
+  acceptance-test:
+    # Linux only. The suite needs a browser and two local servers, and on the macOS
+    # runner a loopback connection to a listening Python process times out rather than
+    # connecting, which is a property of the runner rather than of this library.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install Poetry
+        run: pipx install poetry
+      - name: Install
+        run: poetry install
+      - name: Install browsers
+        run: poetry run rfbrowser init
+      - name: Acceptance tests
+        # Measured as well: this suite covers the real proxy paths that the unit tests
+        # can only reach through mocks.
+        run: poetry run coverage run --parallel-mode -m robot --outputdir atest-results atest/testcases
+      - name: Report acceptance coverage
+        if: always()
+        run: |
+          poetry run coverage combine
+          poetry run coverage report
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: atest-results
+          path: atest-results
