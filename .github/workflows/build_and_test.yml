@@ -4,12 +4,20 @@ on:
   push:
     branches:
       - main
+  # Every pull request, whatever branch it targets, including from forks. Pushes to
+  # other branches are covered once a pull request exists; workflow_dispatch runs the
+  # suite on demand before that.
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+# A pull request from a branch in this repo would otherwise start two identical runs,
+# and every new push would race the run it supersedes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
