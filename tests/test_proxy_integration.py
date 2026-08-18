@@ -71,7 +71,10 @@ class TestProxyIntegration(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             self.library.start_mitm_proxy(listen_port=self.port)
-        self.assertIn("address already in use", str(context.exception))
+        # The wording of the bind error differs per platform, so match on what the
+        # library itself contributes rather than on the operating system's message.
+        self.assertIn("Could not start the proxy", str(context.exception))
+        self.assertIn(str(self.port), str(context.exception))
         self.assertIsNone(self.library.proxy_master)
 
     def test_proxy_can_be_restarted_on_the_same_port(self):

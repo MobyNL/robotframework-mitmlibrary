@@ -145,7 +145,7 @@ Check HTTPS POST Response
     Should Be Equal As Integers    ${response.status_code}    ${expected_status_code}
 
 Open Browser Through Proxy
-    &{proxy_dict}    Create Dictionary    server=http://localhost:${PROXY_PORT}
+    &{proxy_dict}    Create Dictionary    server=http://127.0.0.1:${PROXY_PORT}
     New Browser    browser=chromium    headless=True    proxy=${proxy_dict}
     New Context    ignoreHTTPSErrors=${True}
     New Page
@@ -155,14 +155,14 @@ Start Servers
     ${https_port}    Get Free Port
     ${proxy_port}    Get Free Port
     VAR    ${PROXY_PORT}    ${proxy_port}    scope=suite
-    VAR    ${HTTP_HOST}    localhost:${http_port}    scope=suite
-    VAR    ${HTTP_URL}    http://localhost:${http_port}    scope=suite
-    VAR    ${HTTPS_URL}    https://localhost:${https_port}    scope=suite
+    VAR    ${HTTP_HOST}    127.0.0.1:${http_port}    scope=suite
+    VAR    ${HTTP_URL}    http://127.0.0.1:${http_port}    scope=suite
+    VAR    ${HTTPS_URL}    https://127.0.0.1:${https_port}    scope=suite
 
     ${http_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
-    ...    run    --port    ${http_port}
+    ...    run    --host    127.0.0.1    --port    ${http_port}
     ${https_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
-    ...    run    --port    ${https_port}    --cert    adhoc
+    ...    run    --host    127.0.0.1    --port    ${https_port}    --cert    adhoc
     VAR    ${HTTP_PROCESS}    ${http_process}    scope=suite
     VAR    ${HTTPS_PROCESS}    ${https_process}    scope=suite
     Wait Until Server Is Up    ${HTTP_URL}/
@@ -170,12 +170,12 @@ Start Servers
 
     # ssl_insecure is required because the local HTTPS server uses a self-signed
     # certificate, which the proxy would otherwise refuse to connect to.
-    Start Mitm Proxy    localhost    ${proxy_port}
+    Start Mitm Proxy    127.0.0.1    ${proxy_port}
     ...    certificates_directory=${CURDIR}/../resources/certificates
     ...    ssl_insecure=${True}
 
-    &{requests_proxy}    Create Dictionary    http=http://localhost:${proxy_port}
-    ...    https=http://localhost:${proxy_port}
+    &{requests_proxy}    Create Dictionary    http=http://127.0.0.1:${proxy_port}
+    ...    https=http://127.0.0.1:${proxy_port}
     Create Session    alias=proxy    url=${HTTP_URL}    proxies=${requests_proxy}    timeout=30
     Create Session    alias=secure    url=${HTTPS_URL}    proxies=${requests_proxy}
     ...    verify=${False}    timeout=30
