@@ -95,6 +95,7 @@ class ProxyController:
             with_dumper=False,
         )
         self.master = master
+        self._disable_errorcheck(master)
         for addon in addon_factory(master):
             master.addons.add(addon)
         collector = StartupErrorCollector()
@@ -108,6 +109,26 @@ class ProxyController:
             )
         finally:
             logging.getLogger().removeHandler(collector)
+
+    @staticmethod
+    def _disable_errorcheck(master: dump.DumpMaster) -> None:
+        """Removes mitmproxy's errorcheck addon, which is wrong for a library.
+
+        The addon calls `sys.exit(1)` when anything logged an error while a master starts,
+        which is right for the mitmproxy command line tools and wrong here. It watches the
+        root logger, so the error can come from a proxy this library started earlier, or
+        from anywhere else in the test run, and killing an unrelated proxy for it is not
+        something a suite can act on - least of all as a SystemExit raised on the
+        background loop thread. Startup failures are detected by `_fail_on_startup_error`
+        instead, which reports what actually went wrong with this proxy.
+        """
+        errorcheck = master.addons.get("errorcheck")
+        if errorcheck is None:  # pragma: no cover - always present in DumpMaster
+            return
+        master.addons.remove(errorcheck)
+        # The addon installs a handler on the root logger in its constructor and only
+        # uninstalls it on the startup path it no longer reaches.
+        errorcheck.finish()
 
     def _fail_on_startup_error(
         self,

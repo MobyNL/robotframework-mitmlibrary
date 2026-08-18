@@ -5,6 +5,7 @@ way the library talks to mitmproxy itself. These tests exercise that boundary fo
 both of the failure modes below were live bugs that a mocked DumpMaster hid.
 """
 
+import logging
 import shutil
 import socket
 import tempfile
@@ -88,10 +89,30 @@ class TestProxyIntegration(unittest.TestCase):
         self.assertNotEqual(address.port, 0)
         self.assertEqual(address.url, f"http://127.0.0.1:{address.port}")
 
-        # The reported port must be the one that is actually bound: connecting to it is
-        # the only assertion that would catch an address read from the wrong place.
-        with socket.create_connection(("127.0.0.1", address.port), timeout=5):
-            pass
+        # The reported port must be the one that is actually bound, which binding it
+        # ourselves proves. Opening a connection would prove it too, but a client that
+        # connects and never sends a request makes the proxy log an error, and that
+        # error then belongs to no test in particular.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            with self.assertRaises(OSError):
+                sock.bind(("127.0.0.1", address.port))
+
+    def test_an_unrelated_logged_error_does_not_kill_the_proxy(self):
+        """mitmproxy's errorcheck addon exits the process when anything logged an error
+        while a master starts. It watches the root logger, so the error can come from a
+        proxy started earlier or from any other part of the test run, and the library
+        removes the addon rather than let an unrelated message take a proxy down.
+        """
+        logging.getLogger("some.other.component").error("unrelated failure")
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertEqual(
+            self.library.controller.listen_addresses(), [("127.0.0.1", self.port)]
+        )
+
+    def test_the_errorcheck_addon_is_removed(self):
+        """Pins the reason for the test above, so a revert is reported as itself."""
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertIsNone(self.library.proxy_master.addons.get("errorcheck"))
 
 
 if __name__ == "__main__":
