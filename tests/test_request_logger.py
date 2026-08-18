@@ -209,7 +209,9 @@ class TestRequestLogger(unittest.TestCase):
         flow = make_flow("http://example.com/api")
         start = time.monotonic()
         asyncio.run(self.req_logger.response(flow))
-        self.assertGreaterEqual(time.monotonic() - start, 0.3)
+        # Windows has a ~15.6ms timer granularity, so a 300ms sleep can return a few
+        # milliseconds early. The point is that a delay happened at all, not its precision.
+        self.assertGreaterEqual(time.monotonic() - start, 0.25)
 
     def test_response_delay_does_not_block_the_event_loop(self):
         """The delay must yield to the loop so other flows keep being served."""

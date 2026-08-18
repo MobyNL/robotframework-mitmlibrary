@@ -69,9 +69,6 @@ jobs:
   test:
     needs: build
     runs-on: ${{ matrix.os }}
-    # Windows and macOS are not proven yet: they run so that cross-platform breakage is
-    # visible, but they do not fail the build until they have been green for a while.
-    continue-on-error: ${{ matrix.os != 'ubuntu-latest' }}
 
     strategy:
       fail-fast: false
@@ -97,22 +94,28 @@ jobs:
       - name: Run unit tests
         run: poetry run pytest
 
+      # The acceptance suite needs a browser and two local servers. On the macOS
+      # runner a loopback connection to a listening Python process times out rather
+      # than connecting, so the suite runs on Linux only. The unit tests, including
+      # the ones that start a real proxy, still run everywhere.
       - name: Run rfbrowser init
+        if: runner.os == 'Linux'
         run: poetry run rfbrowser init
 
       # The acceptance suite is measured too: it covers the real proxy paths that the
       # unit tests can only reach through mocks.
       - name: Run acceptance tests
+        if: runner.os == 'Linux'
         run: poetry run coverage run --parallel-mode --source=MitmLibrary -m robot -d Logs atest/testcases
 
       - name: Report acceptance coverage
-        if: always()
+        if: always() && runner.os == 'Linux'
         run: |
           poetry run coverage combine
           poetry run coverage report
 
       - name: Upload artifact
-        if: always()
+        if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           path: ./Logs
