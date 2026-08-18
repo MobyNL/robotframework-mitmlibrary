@@ -168,6 +168,46 @@ class TestProxyIntegration(unittest.TestCase):
             opener.open(url, timeout=5).close()
         except Exception:  # noqa: BLE001 - the answer does not matter, only the record
             pass
+    def test_stopping_removes_the_mitmproxy_log_handler(self):
+        """mitmproxy leaves a root logger handler behind that outlives its own loop.
+
+        Every record logged afterwards is forwarded to a closed event loop, which raises
+        inside logging, and a run that starts several proxies accumulates one handler
+        per proxy. Nothing in the library logs enough to notice; a long suite does.
+        """
+        from mitmproxy import log as mitmproxy_log
+
+        def installed():
+            return [
+                handler
+                for handler in logging.getLogger().handlers
+                if isinstance(handler, mitmproxy_log.MitmLogHandler)
+            ]
+
+        before = len(installed())
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertGreater(len(installed()), before)
+        self.library.stop_mitm_proxy()
+        self.assertEqual(len(installed()), before)
+
+        # Logging after the proxy is gone must not raise into the logging machinery.
+        logging.getLogger("some.other.component").warning("after the proxy stopped")
+
+    def test_starting_several_proxies_does_not_pile_up_log_handlers(self):
+        from mitmproxy import log as mitmproxy_log
+
+        def installed():
+            return [
+                handler
+                for handler in logging.getLogger().handlers
+                if isinstance(handler, mitmproxy_log.MitmLogHandler)
+            ]
+
+        before = len(installed())
+        for _ in range(3):
+            self.library.start_mitm_proxy(listen_port=free_port())
+            self.library.stop_mitm_proxy()
+        self.assertEqual(len(installed()), before)
 
 
 if __name__ == "__main__":

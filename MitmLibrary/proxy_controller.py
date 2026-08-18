@@ -259,8 +259,28 @@ class ProxyController:
                 )
             except Exception as error:  # pylint: disable=broad-exception-caught
                 logger.info(f"The proxy stopped with an error: {error}")
+        self._uninstall_log_handler()
         self.master = None
         self.future = None
+
+    def _uninstall_log_handler(self) -> None:
+        """Removes the root logger handler mitmproxy installed for this master.
+
+        mitmproxy attaches a handler to the root logger that forwards every log record
+        to the master's event loop. It never removes it, so once the proxy has stopped
+        and its loop is closed, any later log record - from anywhere in the test run -
+        raises "Event loop is closed" inside logging. Starting several proxies in one run
+        leaves one such handler behind each time.
+        """
+        if self.master is None:
+            return
+        handler = getattr(self.master, "_legacy_log_events", None)
+        if handler is None:  # pragma: no cover - present in every version we support
+            return
+        try:
+            handler.uninstall()
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            logger.info(f"Could not remove the mitmproxy log handler: {error}")
 
     def _close_servers(self) -> None:
         """Closes the listening sockets held by the proxyserver addon.
