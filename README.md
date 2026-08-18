@@ -44,8 +44,8 @@ Library       MitmLibrary
 Block and Delay Websites
     Start Mitm Proxy
 
-    # Block requests to Robot Framework website
-    Add To Blocklist    robotframework.org
+    # Answer requests to the Robot Framework website with 403 instead of passing them on
+    Block Requests      ads           robotframework.org
 
     # Delay requests to Google
     Add Response Delay  GoogleDelay   https://www.google.com  5  # Delay for 5 seconds
@@ -56,6 +56,27 @@ Block and Delay Websites
     Stop Mitm Proxy
 
 ```
+
+### Rules
+
+Everything the proxy does is a rule, and every rule is addressed the same way: an alias, a
+url pattern, and optionally an HTTP method. `Remove Rule` removes any of them,
+`Clear All Rules` removes all of them, and `Get Proxy Rules` reports what is loaded.
+
+Every rule keyword takes the same matching arguments:
+
+```robotframework
+Set Response Status   flaky   /api/orders   500   method=POST   match=REGEX   times=1
+```
+
+- `match` is `SUBSTRING` (the default), `REGEX` or `GLOB`. A glob is matched against the
+  whole url, so `*/api/*` matches where `api` alone does not.
+- `method` restricts the rule to one HTTP method; `ANY`, the default, matches all of them.
+- `times` limits how often the rule may be applied; `0`, the default, means unlimited.
+
+All matching rules are applied. A rule that blocks a request ends it and nothing after it
+runs; otherwise `Set Response` runs before rules that change part of a response, which run
+before delays, so combinations behave predictably rather than overwriting each other.
 
 By default the proxy listens on `127.0.0.1:8080`. Pass a different host explicitly if the
 proxy must be reachable from another machine or container:

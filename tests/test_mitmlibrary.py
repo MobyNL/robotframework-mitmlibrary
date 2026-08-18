@@ -20,7 +20,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
     def test_keyword_before_start_raises_readable_error(self):
         """Using a keyword before starting the proxy must not be an AttributeError."""
         with self.assertRaises(RuntimeError) as context:
-            self.library.add_to_blocklist("example.com")
+            self.library.block_requests("ads", "example.com")
         self.assertIn("Start Mitm Proxy", str(context.exception))
 
     def test_stop_without_start_is_a_no_op(self):
@@ -33,9 +33,9 @@ class TestMitmLibraryGuards(unittest.TestCase):
         self.assertTrue(self.library.log_to_console)
 
     def test_console_logging_propagates_to_running_proxy(self):
-        self.library.request_logger = Mock()
+        self.library.interceptor = Mock()
         self.library.turn_mitm_console_logging_off()
-        self.library.request_logger.set_console_logging.assert_called_once_with(False)
+        self.library.interceptor.set_console_logging.assert_called_once_with(False)
 
     def test_start_failure_is_raised(self):
         """A proxy that never binds must fail the keyword, not run green."""
@@ -51,7 +51,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
             with self.assertRaises(RuntimeError) as context:
                 self.library.start_mitm_proxy(listen_port=8099)
         self.assertIn("Could not start the proxy", str(context.exception))
-        self.assertIsNone(self.library.request_logger)
+        self.assertIsNone(self.library.interceptor)
         self.assertIsNone(self.library.proxy_master)
 
     def test_start_failure_reports_the_logged_reason(self):
@@ -94,7 +94,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
             self._bound_master(mock_master)
             self.library.start_mitm_proxy(listen_port=8099)
-        self.assertIsNotNone(self.library.request_logger)
+        self.assertIsNotNone(self.library.interceptor)
 
     def _bound_master(self, mock_master, port=8099):
         """Makes a patched DumpMaster look like a proxy that came up cleanly.
@@ -147,7 +147,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
             self.library.stop_mitm_proxy()
         master.shutdown.assert_called_once()
         self.assertIsNone(self.library.proxy_master)
-        self.assertIsNone(self.library.request_logger)
+        self.assertIsNone(self.library.interceptor)
         self.assertIsNone(self.library.controller.future)
 
     def test_proxy_dying_immediately_is_raised(self):
@@ -163,44 +163,87 @@ class TestMitmLibraryGuards(unittest.TestCase):
         self.assertIn("stopped immediately", str(context.exception))
         self.assertIsNone(self.library.proxy_master)
 
-    def test_keywords_delegate_to_the_request_logger(self):
-        """Every delegating keyword must reach the running proxy's request logger."""
+    def test_rule_keywords_register_rules(self):
+        """Every rule keyword must land in the registry the running proxy reads."""
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
             self._bound_master(mock_master)
             self.library.start_mitm_proxy()
-        request_logger = self.library.request_logger
 
-        self.library.add_to_blocklist("example.com")
-        self.library.add_custom_response("alias", "/api", None, "body", 201)
+        self.library.block_requests("ads", "example.com")
+        self.library.set_response("alias", "/api", 201, None, "body")
         self.library.add_response_delay("delay", "/slow", "2s")
-        self.library.add_custom_response_status_code("status", "/api", 418)
+        self.library.set_response_status("status", "/api", 418)
 
-        self.assertEqual(request_logger.block_list, ["example.com"])
-        self.assertEqual(request_logger.custom_response_list[0].status_code, 201)
-        self.assertEqual(request_logger.response_delays_list[0].delay, "2s")
-        self.assertEqual(request_logger.custom_response_status[0].status_code, 418)
+        rules = {rule.alias: rule for rule in self.library.get_proxy_rules()}
+        self.assertEqual(rules["ads"]["type"], "block")
+        self.assertEqual(rules["alias"]["status_code"], 201)
+        self.assertEqual(rules["delay"]["delay"], "2s")
+        self.assertEqual(rules["status"]["status_code"], 418)
 
-        # The log keywords format the collected items; make sure they render them.
         with patch.object(logger, "info") as mock_info:
-            self.library.log_blocked_urls()
-            self.library.log_delayed_responses()
-            self.library.log_custom_response_items()
-            self.library.log_custom_status_items()
+            self.library.log_proxy_rules()
         logged = " ".join(str(call.args[0]) for call in mock_info.call_args_list)
         self.assertIn("example.com", logged)
         self.assertIn("/slow", logged)
-        self.assertIn("/api", logged)
         self.assertIn("418", logged)
 
-        self.library.remove_url_from_blocklist("example.com")
-        self.library.remove_custom_response("alias")
-        self.library.remove_custom_status_code("status")
-        self.assertEqual(request_logger.block_list, [])
-        self.assertEqual(request_logger.custom_response_list, [])
-        self.assertEqual(request_logger.custom_response_status, [])
+        self.library.remove_rule("ads")
+        self.library.remove_rule("alias")
+        self.library.remove_rule("status")
+        self.assertEqual([rule.alias for rule in self.library.get_proxy_rules()], ["delay"])
 
-        self.library.clear_all_proxy_items()
-        self.assertEqual(request_logger.response_delays_list, [])
+        self.library.clear_all_rules()
+        self.assertEqual(self.library.get_proxy_rules(), [])
+
+    def test_logging_rules_when_there_are_none(self):
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        with patch.object(logger, "info") as mock_info:
+            self.library.log_proxy_rules()
+        logged = " ".join(str(call.args[0]) for call in mock_info.call_args_list)
+        self.assertIn("No rules are loaded", logged)
+
+    def test_removing_an_unknown_rule_warns_instead_of_failing(self):
+        """A teardown removing a rule a failed test never added must not fail as well."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        with patch.object(logger, "warn") as mock_warn:
+            self.library.remove_rule("never-added")
+        self.assertIn("never-added", mock_warn.call_args[0][0])
+
+    def test_reusing_an_alias_reports_the_replacement(self):
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        self.library.set_response_status("alias", "/api", 404)
+        with patch.object(logger, "info") as mock_info:
+            self.library.set_response_status("alias", "/api", 500)
+        logged = " ".join(str(call.args[0]) for call in mock_info.call_args_list)
+        self.assertIn("Replaced", logged)
+        rules = self.library.get_proxy_rules()
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(rules[0]["status_code"], 500)
+
+    def test_an_invalid_delay_fails_the_keyword(self):
+        """The delay is converted here so a bad value fails the keyword that set it."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        with self.assertRaises(ValueError):
+            self.library.add_response_delay("delay", "/slow", "not a time")
+
+    def test_rules_survive_a_restart_of_the_proxy(self):
+        """The registry outlives the proxy; only the addon reading it is rebuilt."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+            self.library.block_requests("ads", "example.com")
+            self.library.stop_mitm_proxy()
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        self.assertEqual([rule.alias for rule in self.library.get_proxy_rules()], ["ads"])
 
     def test_slow_shutdown_warns_instead_of_hanging_forever(self):
         with (
@@ -291,8 +334,8 @@ class TestMitmLibraryGuards(unittest.TestCase):
             self.library.stop_mitm_proxy()
         self.assertIn("not listening", str(context.exception))
 
-    def test_failed_start_clears_the_request_logger(self):
-        """A logger left behind would belong to a proxy that is not running."""
+    def test_failed_start_clears_the_interceptor(self):
+        """An interceptor left behind would belong to a proxy that is not running."""
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
             patch("MitmLibrary.proxy_controller.STARTUP_TIMEOUT", 0.3),
@@ -304,7 +347,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
             mock_master.return_value.run = _never_binds
             with self.assertRaises(RuntimeError):
                 self.library.start_mitm_proxy()
-        self.assertIsNone(self.library.request_logger)
+        self.assertIsNone(self.library.interceptor)
 
     def test_controller_shutdown_stops_a_running_proxy_and_its_thread(self):
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:

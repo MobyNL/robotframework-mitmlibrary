@@ -11,7 +11,51 @@ promise in the README.
 
 ## [Unreleased]
 
+### Changed - breaking
+
+Every kind of manipulation used to have its own list, its own remove keyword and its own
+log keyword, and the blocklist had no alias at all. They are now one rule model, which
+means one way to address a rule, the same matching options everywhere, and a defined order
+when several rules match the same request. Migrating is a rename plus, for blocking, an
+alias:
+
+| Before | Now |
+| --- | --- |
+| `Add To Blocklist    url` | `Block Requests    alias    url` |
+| `Add Custom Response    alias    url    overwrite_headers=    overwrite_body=` | `Set Response    alias    url    headers=    body=` |
+| `Add Custom Response Status Code    alias    url    status_code` | `Set Response Status    alias    url    status_code` |
+| `Remove Url From Blocklist    url` | `Remove Rule    alias` |
+| `Remove Custom Response    alias` | `Remove Rule    alias` |
+| `Remove Custom Status Code    alias` | `Remove Rule    alias` |
+| `Clear All Proxy Items` | `Clear All Rules` |
+| `Log Blocked Urls`, `Log Delayed Responses`, `Log Custom Response Items`, `Log Custom Status Items` | `Log Proxy Rules` |
+
+`Add Response Delay` keeps its name and arguments.
+
+Two behaviour changes come with it:
+
+- **A blocked request is answered with `403` instead of having its connection dropped.**
+  The documentation always said it was a 403; the code killed the connection. Answering
+  is now the default because every HTTP client reports it the same way, where a dropped
+  connection surfaces as a different exception in each of them. Pass `mode=RESET` for the
+  old behaviour.
+- **All matching rules are applied, in a defined order.** A blocking rule ends the
+  request and nothing after it runs. Otherwise `Set Response` runs before rules that
+  change part of a response, which run before delays, and delays add up. Previously a
+  later custom response could silently throw away an earlier status change.
+
 ### Added
+
+- Every rule keyword takes `method`, `match` and `times`. `match` is `SUBSTRING` (the
+  default, and what the library did before), `REGEX` or `GLOB`. `method` restricts a rule
+  to one HTTP method. `times` limits how often a rule may be applied, and an exhausted
+  rule stays visible in `Get Proxy Rules` with `remaining=0` rather than disappearing.
+  An unusable regular expression fails the keyword that configured it, not the proxy
+  later.
+- `Get Proxy Rules` returns the loaded rules in the order they are applied.
+- Blocking rules have an alias, like every other rule, so they are removed the same way.
+- Rules survive a restart of the proxy: the registry outlives it, and only the addon
+  reading it is rebuilt.
 
 - `Get Proxy Address` returns the host, port and url the proxy is actually listening on.
   It reads the address from the running proxy rather than echoing back the arguments,
