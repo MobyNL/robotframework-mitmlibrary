@@ -19,6 +19,7 @@ from robot.api import logger
 from robot.api.deco import keyword, library, not_keyword
 from robot.utils import DotDict
 
+from MitmLibrary.listener import LibraryListener
 from MitmLibrary.proxy_controller import ProxyController
 from MitmLibrary.request_logger import RequestLogger
 from MitmLibrary.version import VERSION
@@ -81,6 +82,9 @@ class MitmLibrary:
         self.controller: ProxyController = ProxyController()
         self.request_logger: Optional[RequestLogger] = None
         self.log_to_console: bool = True
+        # Robot Framework calls close() on this when the suite that imported the library
+        # ends, which releases the port even if the suite never stopped the proxy itself.
+        self.ROBOT_LIBRARY_LISTENER: LibraryListener = LibraryListener(self.controller)
 
     @property
     def proxy_master(self) -> Optional[dump.DumpMaster]:
