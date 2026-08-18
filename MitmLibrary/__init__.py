@@ -19,6 +19,7 @@ from robot.api import logger
 from robot.api.deco import keyword, library, not_keyword
 from robot.utils import DotDict, timestr_to_secs
 
+from MitmLibrary.failures import TimeoutAction, TruncateAction
 from MitmLibrary.interceptor import Interceptor
 from MitmLibrary.listener import LibraryListener
 from MitmLibrary.matching import ANY_METHOD, MatchMode, UrlMatcher
@@ -152,6 +153,25 @@ class MitmLibrary:
 
     | # Send everything on through the network's own proxy
     | Start Mitm Proxy    mode=upstream:http://corporate-proxy:3128
+
+    = Failure simulation =
+    Most rules make a request succeed differently. These make it fail the way a network
+    fails, which is usually the least exercised path in an application:
+
+    - `Simulate Timeout` holds a request and then drops it, so the client waits for an
+      answer that never comes.
+    - `Simulate Truncated Response` cuts an answer short while it still claims to be the
+      full length.
+    - A dropped connection is `Block Requests` with `mode=RESET`, which is where that
+      behaviour lives rather than in a keyword of its own.
+
+    How a client reports any of these depends on the HTTP library it uses, so assert that
+    a request failed rather than on the particular error it raised.
+
+    Bandwidth throttling is not supported. mitmproxy hands a response body to a
+    synchronous callback, with no way to wait between chunks, so the only implementable
+    version would delay the whole body and deliver it in one piece - which is
+    `Add Response Delay`, honestly named.
 
     = Mitm Certificates =
     To test with SSL verification or use a browser without ignoring certificates, you need to set up
@@ -679,6 +699,88 @@ class MitmLibrary:
         self._require_proxy()
         self._add_rule(
             alias, url, method, match, times, RedirectAction(host, port, scheme)
+        )
+
+    @keyword
+    def simulate_timeout(
+        self,
+        alias: str,
+        url: str,
+        hold: str = "60s",
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Holds matching requests and then drops them, without contacting the server.
+
+        This is what a client sees when a service accepts its connection and then says
+        nothing, and it is a different test from a service that answers with an error: an
+        application that handles a 504 correctly may still wait forever when nothing
+        arrives at all.
+
+        Hold the request for longer than the client's own timeout, so the client is the
+        one that gives up. Other traffic is unaffected while a request is held.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `hold`: How long to hold the request, in Robot Framework time format. It is
+          then dropped, so the client does not wait forever if its own timeout is longer.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | Simulate Timeout    hang    /api/orders    hold=30s
+        """
+        self._require_proxy()
+        self._add_rule(
+            alias, url, method, match, times, TimeoutAction(timestr_to_secs(hold), hold)
+        )
+
+    @keyword
+    def simulate_truncated_response(
+        self,
+        alias: str,
+        url: str,
+        keep_bytes: Optional[int] = None,
+        keep_fraction: float = 0.5,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Cuts matching responses short while they still claim to be the full length.
+
+        The response keeps saying how long its body was meant to be, so a client reads
+        what arrived, waits for the rest and eventually gives up. That is what a
+        connection dropped mid-answer looks like, and it is the case that finds parsers
+        which assume a body is either complete or absent.
+
+        How the client reports it differs per HTTP library, so assert that the request
+        failed rather than on a particular error.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `keep_bytes`: How many bytes of the body to keep. Overrides `keep_fraction`.
+        - `keep_fraction`: How much of the body to keep, as a fraction. Half by default.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        A response with no body, and one already shorter than what would be kept, are
+        left alone and say so in the log.
+
+        A compressed body is cut in its compressed form, so what arrives is not decodable
+        rather than being a valid shorter document. That is the more realistic failure,
+        and the more interesting one to test against.
+
+        Example:
+        | Simulate Truncated Response    cut    /api/orders    keep_bytes=10
+        """
+        self._require_proxy()
+        self._add_rule(
+            alias, url, method, match, times, TruncateAction(keep_bytes, keep_fraction)
         )
 
     @keyword

@@ -107,7 +107,7 @@ class BlockAction(Action):
 
     def apply(self, flow: http.HTTPFlow) -> bool:
         if self.mode is BlockMode.RESET:
-            _kill(flow)
+            kill_flow(flow)
             return True
         flow.response = http.Response.make(
             self.status_code, safe_str(self.body) if self.body is not None else b""
@@ -351,7 +351,7 @@ def _is_default_port(scheme: str, port: int) -> bool:
     return (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
 
 
-def _kill(flow: http.HTTPFlow) -> None:
+def kill_flow(flow: http.HTTPFlow) -> None:
     """Drops the connection, if mitmproxy still lets us.
 
     `kill()` raises when the flow is no longer killable, which happens when something else

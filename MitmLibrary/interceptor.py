@@ -28,15 +28,20 @@ class Interceptor:
         """Enables or disables reporting each manipulation on the console."""
         self.log_to_console = value
 
-    def request(self, flow: http.HTTPFlow) -> None:
-        """Applies the rules that act before the request is sent."""
+    async def request(self, flow: http.HTTPFlow) -> None:
+        """Applies the rules that act before the request is sent.
+
+        Asynchronous because a rule may wait here: a simulated timeout holds the request
+        rather than answering it. mitmproxy awaits an addon hook that returns a
+        coroutine, and waiting in one flow does not hold up the others.
+        """
         for rule in self.registry.snapshot(Phase.REQUEST):
             if not self._applies(rule, flow):
                 continue
             if not self.registry.consume(rule):
                 continue
             self._log(rule, flow)
-            if rule.action.apply(flow):
+            if await rule.action.apply_async(flow):
                 return
 
     async def response(self, flow: http.HTTPFlow) -> None:

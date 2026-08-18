@@ -50,36 +50,40 @@ class RequestRuleTestCase(unittest.TestCase):
     def respond(self, flow):
         asyncio.run(self.interceptor.response(flow))
 
+    def send(self, flow):
+        """Runs the async request hook, as mitmproxy would."""
+        asyncio.run(self.interceptor.request(flow))
+
 
 class TestRequestHeaders(RequestRuleTestCase):
     def test_a_header_can_be_added(self):
         self.add("auth", RequestHeadersAction({"Authorization": "Bearer token"}))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.headers["Authorization"], "Bearer token")
 
     def test_an_existing_header_is_replaced(self):
         self.add("auth", RequestHeadersAction({"Authorization": "Bearer new"}))
         flow = make_flow(headers={"Authorization": "Bearer old"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.headers["Authorization"], "Bearer new")
 
     def test_other_headers_are_left_alone(self):
         """Merging is the point: setting one header must not drop the rest."""
         self.add("auth", RequestHeadersAction({"Authorization": "Bearer token"}))
         flow = make_flow(headers={"X-Kept": "yes"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.headers["X-Kept"], "yes")
 
     def test_a_header_can_be_removed(self):
         self.add("cookies", RequestHeadersAction(None, ["Cookie"]))
         flow = make_flow(headers={"Cookie": "session=1"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertNotIn("Cookie", flow.request.headers)
 
     def test_removing_a_header_that_is_not_there_is_a_no_op(self):
         self.add("cookies", RequestHeadersAction(None, ["Cookie"]))
-        self.interceptor.request(make_flow())  # must not raise
+        self.send(make_flow())  # must not raise
 
     def test_removing_and_setting_the_same_header_leaves_one_value(self):
         """Headers can repeat; naming one in both is how a suite collapses them."""
@@ -87,7 +91,7 @@ class TestRequestHeaders(RequestRuleTestCase):
         flow = make_flow()
         flow.request.headers.add("Accept", "text/plain")
         flow.request.headers.add("Accept", "text/html")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(
             flow.request.headers.get_all("Accept"), ["application/json"]
         )
@@ -97,14 +101,14 @@ class TestRequestBody(RequestRuleTestCase):
     def test_the_body_is_replaced(self):
         self.add("payload", RequestBodyAction('{"id": 1}'))
         flow = make_flow(method="POST", body=b"original request")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.content, b'{"id": 1}')
 
     def test_the_content_length_is_updated(self):
         """A declared length that no longer matches makes the request unreadable."""
         self.add("payload", RequestBodyAction("short"))
         flow = make_flow(method="POST", body=b"a much longer original body")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.headers["content-length"], "5")
 
 
@@ -112,7 +116,7 @@ class TestRewrite(RequestRuleTestCase):
     def test_the_whole_url_is_replaced(self):
         self.add("v2", RewriteAction("https://other.example.com:8443/api/v2/users?x=1"))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(
             flow.request.pretty_url, "https://other.example.com:8443/api/v2/users?x=1"
         )
@@ -120,7 +124,7 @@ class TestRewrite(RequestRuleTestCase):
     def test_the_parts_of_the_request_stay_consistent(self):
         self.add("v2", RewriteAction("https://other.example.com:8443/api/v2/users"))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.scheme, "https")
         self.assertEqual(flow.request.host, "other.example.com")
         self.assertEqual(flow.request.port, 8443)
@@ -133,7 +137,7 @@ class TestRewrite(RequestRuleTestCase):
         """
         self.add("v2", RewriteAction("https://other.example.com:8443/api/v2/users"))
         flow = make_flow(headers={"Host": "example.com"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.host_header, "other.example.com:8443")
 
 
@@ -141,7 +145,7 @@ class TestRedirect(RequestRuleTestCase):
     def test_the_host_is_replaced_and_the_path_is_kept(self):
         self.add("stub", RedirectAction("127.0.0.1", 8000))
         flow = make_flow(url="http://api.example.com/api/users?page=2")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.host, "127.0.0.1")
         self.assertEqual(flow.request.port, 8000)
         self.assertEqual(flow.request.path, "/api/users?page=2")
@@ -149,13 +153,13 @@ class TestRedirect(RequestRuleTestCase):
     def test_the_original_port_is_kept_when_none_is_given(self):
         self.add("stub", RedirectAction("127.0.0.1"))
         flow = make_flow(url="http://api.example.com:9000/api/users")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.port, 9000)
 
     def test_the_scheme_can_be_changed(self):
         self.add("stub", RedirectAction("127.0.0.1", 8000, "https"))
         flow = make_flow(url="http://api.example.com/api/users")
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.scheme, "https")
 
     def test_the_host_header_is_updated(self):
@@ -163,7 +167,7 @@ class TestRedirect(RequestRuleTestCase):
         self.add("stub", RedirectAction("127.0.0.1", 8000))
         flow = make_flow(url="http://api.example.com/api/users",
                          headers={"Host": "api.example.com"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.host_header, "127.0.0.1:8000")
 
     def test_a_default_port_is_left_out_of_the_host_header(self):
@@ -171,14 +175,14 @@ class TestRedirect(RequestRuleTestCase):
         self.add("stub", RedirectAction("other.example.com", 80))
         flow = make_flow(url="http://api.example.com/api/users",
                          headers={"Host": "api.example.com"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.host_header, "other.example.com")
 
     def test_a_default_https_port_is_left_out_too(self):
         self.add("stub", RedirectAction("other.example.com", 443, "https"))
         flow = make_flow(url="http://api.example.com/api/users",
                          headers={"Host": "api.example.com"})
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.request.host_header, "other.example.com")
 
     def test_a_request_without_a_host_header_does_not_gain_one(self):
@@ -186,7 +190,7 @@ class TestRedirect(RequestRuleTestCase):
         self.add("stub", RedirectAction("127.0.0.1", 8000))
         flow = make_flow()
         self.assertIsNone(flow.request.host_header)  # tflow builds one without it
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertIsNone(flow.request.host_header)
 
 

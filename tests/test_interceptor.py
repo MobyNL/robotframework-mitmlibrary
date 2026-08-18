@@ -59,26 +59,30 @@ class InterceptorTestCase(unittest.TestCase):
         """Runs the async response hook, as mitmproxy would."""
         asyncio.run(self.interceptor.response(flow))
 
+    def send(self, flow):
+        """Runs the async request hook, as mitmproxy would."""
+        asyncio.run(self.interceptor.request(flow))
+
 
 class TestBlocking(InterceptorTestCase):
     def test_respond_mode_answers_without_reaching_the_server(self):
         self.add("block", BlockAction(BlockMode.RESPOND, 403))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.response.status_code, 403)
         flow.kill.assert_not_called()
 
     def test_respond_mode_can_carry_a_body(self):
         self.add("block", BlockAction(BlockMode.RESPOND, 503, "maintenance"))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.response.content, b"maintenance")
         self.assertEqual(flow.response.status_code, 503)
 
     def test_reset_mode_drops_the_connection(self):
         self.add("block", BlockAction(BlockMode.RESET))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         flow.kill.assert_called_once()
 
     def test_reset_mode_does_not_raise_on_a_flow_that_cannot_be_killed(self):
@@ -87,13 +91,13 @@ class TestBlocking(InterceptorTestCase):
         flow = make_flow()
         flow.killable = False
         flow.kill.side_effect = exceptions.ControlException("Flow is not killable.")
-        self.interceptor.request(flow)  # must not raise
+        self.send(flow)  # must not raise
         flow.kill.assert_not_called()
 
     def test_a_request_that_does_not_match_is_left_alone(self):
         self.add("block", BlockAction(), url="/orders")
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.response.status_code, 200)
 
     def test_blocking_ends_the_flow(self):
@@ -101,7 +105,7 @@ class TestBlocking(InterceptorTestCase):
         self.add("first", BlockAction(BlockMode.RESPOND, 403))
         second = self.add("second", BlockAction(BlockMode.RESPOND, 503))
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.response.status_code, 403)
         self.assertEqual(second.used, 0)
 
@@ -250,9 +254,9 @@ class TestTimes(InterceptorTestCase):
 
     def test_an_exhausted_rule_is_skipped_in_the_request_hook(self):
         rule = self.add("block", BlockAction(BlockMode.RESPOND, 403), times=1)
-        self.interceptor.request(make_flow())
+        self.send(make_flow())
         flow = make_flow()
-        self.interceptor.request(flow)
+        self.send(flow)
         self.assertEqual(flow.response.status_code, 200)
         self.assertEqual(rule.used, 1)
 
