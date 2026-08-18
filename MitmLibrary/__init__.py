@@ -171,13 +171,20 @@ class MitmLibrary:
             self.proxy_future = asyncio.run_coroutine_threadsafe(
                 self.proxy_master.run(), self.loop_handler.loop
             )
-            self._fail_on_startup_error(listen_host, listen_port, collector)
+            self._fail_on_startup_error(
+                listen_host, listen_port, collector, self.proxy_future, self.proxy_master
+            )
         finally:
             logging.getLogger().removeHandler(collector)
 
     @not_keyword
     def _fail_on_startup_error(
-        self, listen_host: str, listen_port: int, collector: "StartupErrorCollector"
+        self,
+        listen_host: str,
+        listen_port: int,
+        collector: "StartupErrorCollector",
+        proxy_future: Future,
+        proxy_master: dump.DumpMaster,
     ) -> None:
         """Raises if the proxy did not manage to bind its listening address.
 
@@ -188,14 +195,14 @@ class MitmLibrary:
         """
         deadline = time.monotonic() + STARTUP_TIMEOUT
         while time.monotonic() < deadline:
-            if self.proxy_future.done():
-                error = self.proxy_future.exception()
+            if proxy_future.done():
+                error = proxy_future.exception()
                 self._discard_proxy(wait=False)
                 raise RuntimeError(
                     f"The proxy on {listen_host}:{listen_port} stopped immediately "
                     f"after starting: {error or 'no error reported'}"
                 )
-            if self._listening_addresses():
+            if self._listening_addresses(proxy_master):
                 return
             if collector.messages:
                 break
@@ -208,9 +215,12 @@ class MitmLibrary:
         )
 
     @not_keyword
-    def _listening_addresses(self) -> list:
+    def _listening_addresses(self, proxy_master: Optional[dump.DumpMaster] = None) -> list:
         """Returns the addresses the proxy server addon is currently bound to."""
-        proxyserver = self.proxy_master.addons.get("proxyserver")
+        master = proxy_master or self.proxy_master
+        if master is None:
+            return []
+        proxyserver = master.addons.get("proxyserver")
         return proxyserver.listen_addrs() if proxyserver else []
 
     @not_keyword
@@ -249,6 +259,8 @@ class MitmLibrary:
         The addon has no teardown hook of its own, and shutting the master down does not
         close its servers, so without this the port stays bound after the proxy stops.
         """
+        if self.proxy_master is None:
+            return
         proxyserver = self.proxy_master.addons.get("proxyserver")
         if proxyserver is None:
             return

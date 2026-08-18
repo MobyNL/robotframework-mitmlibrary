@@ -6,10 +6,10 @@ parallel, and a network dependency fails on an offline or sandboxed runner.
 """
 
 import socket
+import ssl
 import time
 from urllib.error import URLError
 from urllib.request import urlopen
-import ssl
 
 
 def get_free_port() -> int:

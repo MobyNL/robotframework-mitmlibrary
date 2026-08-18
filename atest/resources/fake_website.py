@@ -1,5 +1,6 @@
-from flask import Flask
 import json
+
+from flask import Flask
 
 test_dict = {"a": 1, "b": 2, "c": 3}
 app = Flask(__name__)

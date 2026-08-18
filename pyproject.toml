@@ -1,8 +1,3 @@
-[tool.pylint.messages_control]
-max-line-length = 140
-# The package name is dictated by the Robot Framework library naming convention.
-disable = ["invalid-name"]
-
 [tool.poetry]
 name = "robotframework-mitmlibrary"
 version = "0.3.0"
@@ -30,6 +25,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 
 [tool.poetry.urls]
@@ -37,7 +33,7 @@ classifiers = [
 "Slack Channel" = "https://robotframework.slack.com/archives/C06M2J3J8AC"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = ">=3.12,<3.15"
 mitmproxy = "^12.2.2"
 robotframework = "^7.1.1"
 
@@ -49,10 +45,37 @@ coverage = "^7.6.10"
 robotframework-browser = "^19.1.2"
 robotframework-requests = "^0.9.7"
 setuptools = "^83.0.0"
-pylint = "^4.0.0"
+ruff = "^0.12.4"
+mypy = "^1.18.2"
+robotframework-robocop = "^6.0.0"
+
+[tool.ruff]
+target-version = "py312"  # the oldest Python the package supports
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = ["I"]  # imports
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+order-by-type = false
+
+[tool.mypy]
+python_version = "3.12"
+files = ["MitmLibrary"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+# None of these ship type information.
+module = ["robot.*", "mitmproxy.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-addopts = "-ra --cov=MitmLibrary --cov-report=term-missing --cov-fail-under=95"
+addopts = "-ra --cov --cov-report=term-missing --cov-fail-under=95"
 testpaths = ["tests"]
 # Third-party deprecation noise drowned out our own warnings, so it is silenced by
 # module while anything originating in MitmLibrary is promoted to an error.
@@ -64,6 +87,30 @@ filterwarnings = [
     "ignore:.*deprecated.*:Warning:pyparsing.*",
     "error::DeprecationWarning:MitmLibrary.*",
 ]
+
+[tool.coverage.run]
+branch = true
+source = ["MitmLibrary"]
+
+[tool.robocop.lint]
+ignore = [
+    "missing-doc-test-case",
+    "missing-doc-suite",
+    # The suite starts servers on free ports in its setup and every test needs their
+    # addresses, which is what suite scope is for.
+    "unnecessary-string-conversion",
+    "no-suite-variable",
+]
+configure = [
+    "line-too-long.line_length=140",
+    "too-many-arguments.max_args=10",
+    # Starting a server means picking a port, launching it and waiting for it, three
+    # times over. Splitting further would only scatter one sequence across more keywords.
+    "too-many-calls-in-keyword.max_calls=15",
+]
+
+[tool.robot]
+log-level = "DEBUG"
 
 [build-system]
 requires = ["poetry-core"]
