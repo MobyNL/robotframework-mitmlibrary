@@ -15,9 +15,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
         self.library = MitmLibrary()
 
     def tearDown(self):
-        loop = self.library.loop_handler.loop
-        loop.call_soon_threadsafe(loop.stop)
-        self.library.loop_handler.join(timeout=5)
+        self.library.controller.shutdown()
 
     def test_keyword_before_start_raises_readable_error(self):
         """Using a keyword before starting the proxy must not be an AttributeError."""
@@ -43,12 +41,12 @@ class TestMitmLibraryGuards(unittest.TestCase):
         """A proxy that never binds must fail the keyword, not run green."""
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.STARTUP_TIMEOUT", 0.3),
+            patch("MitmLibrary.proxy_controller.STARTUP_TIMEOUT", 0.3),
         ):
-            mock_master.return_value.addons.get.return_value = SimpleNamespace(
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
                 listen_addrs=list,
                 servers=SimpleNamespace(update=_noop_update),
-            )
+            ))
             mock_master.return_value.run = lambda: _never_binds()
             with self.assertRaises(RuntimeError) as context:
                 self.library.start_mitm_proxy(listen_port=8099)
@@ -60,12 +58,12 @@ class TestMitmLibraryGuards(unittest.TestCase):
         """The mitmproxy error explaining the failure must reach the user."""
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.STARTUP_TIMEOUT", 0.3),
+            patch("MitmLibrary.proxy_controller.STARTUP_TIMEOUT", 0.3),
         ):
-            mock_master.return_value.addons.get.return_value = SimpleNamespace(
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
                 listen_addrs=list,
                 servers=SimpleNamespace(update=_noop_update),
-            )
+            ))
 
             async def failing_run():
                 logging.getLogger("mitmproxy").error("address already in use")
@@ -81,12 +79,12 @@ class TestMitmLibraryGuards(unittest.TestCase):
         before = list(logging.getLogger().handlers)
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.STARTUP_TIMEOUT", 0.3),
+            patch("MitmLibrary.proxy_controller.STARTUP_TIMEOUT", 0.3),
         ):
-            mock_master.return_value.addons.get.return_value = SimpleNamespace(
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
                 listen_addrs=list,
                 servers=SimpleNamespace(update=_noop_update),
-            )
+            ))
             mock_master.return_value.run = lambda: _never_binds()
             with self.assertRaises(RuntimeError):
                 self.library.start_mitm_proxy(listen_port=8099)
@@ -105,10 +103,10 @@ class TestMitmLibraryGuards(unittest.TestCase):
         shutdown path is exercised for real without waiting out a fixed sleep.
         """
         stop = threading.Event()
-        mock_master.return_value.addons.get.return_value = SimpleNamespace(
+        mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
             listen_addrs=lambda: [("127.0.0.1", port)],
             servers=SimpleNamespace(update=_noop_update),
-        )
+        ))
         mock_master.return_value.shutdown.side_effect = stop.set
         mock_master.return_value.run = lambda: _runs_until_stopped(stop)
         return mock_master.return_value
@@ -117,7 +115,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
         """A given directory must reach mitmproxy as 'confdir'."""
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.options.Options") as mock_options,
+            patch("MitmLibrary.proxy_controller.options.Options") as mock_options,
         ):
             self._bound_master(mock_master)
             self.library.start_mitm_proxy(certificates_directory="/tmp/certs")
@@ -127,7 +125,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
         """Options rejects confdir=None, so the key must be left out entirely."""
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.options.Options") as mock_options,
+            patch("MitmLibrary.proxy_controller.options.Options") as mock_options,
         ):
             self._bound_master(mock_master)
             self.library.start_mitm_proxy()
@@ -136,7 +134,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
     def test_default_listen_host_is_localhost(self):
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.options.Options") as mock_options,
+            patch("MitmLibrary.proxy_controller.options.Options") as mock_options,
         ):
             self._bound_master(mock_master)
             self.library.start_mitm_proxy()
@@ -150,15 +148,15 @@ class TestMitmLibraryGuards(unittest.TestCase):
         master.shutdown.assert_called_once()
         self.assertIsNone(self.library.proxy_master)
         self.assertIsNone(self.library.request_logger)
-        self.assertIsNone(self.library.proxy_future)
+        self.assertIsNone(self.library.controller.future)
 
     def test_proxy_dying_immediately_is_raised(self):
         """A proxy whose run() returns straight away must fail the keyword."""
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
-            mock_master.return_value.addons.get.return_value = SimpleNamespace(
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
                 listen_addrs=list,
                 servers=SimpleNamespace(update=_noop_update),
-            )
+            ))
             mock_master.return_value.run = lambda: _returns_immediately()
             with self.assertRaises(RuntimeError) as context:
                 self.library.start_mitm_proxy()
@@ -207,7 +205,7 @@ class TestMitmLibraryGuards(unittest.TestCase):
     def test_slow_shutdown_warns_instead_of_hanging_forever(self):
         with (
             patch("MitmLibrary.dump.DumpMaster") as mock_master,
-            patch("MitmLibrary.SHUTDOWN_TIMEOUT", 0.2),
+            patch("MitmLibrary.proxy_controller.SHUTDOWN_TIMEOUT", 0.2),
         ):
             self._bound_master(mock_master)
             # A proxy that ignores the shutdown request must not hang the keyword.
@@ -222,9 +220,9 @@ class TestMitmLibraryGuards(unittest.TestCase):
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
             self._bound_master(mock_master)
             self.library.start_mitm_proxy()
-            mock_master.return_value.addons.get.return_value = SimpleNamespace(
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
                 listen_addrs=list, servers=SimpleNamespace(update=_failing_update)
-            )
+            ))
             with patch.object(logger, "warn") as mock_warn:
                 self.library.stop_mitm_proxy()
         self.assertIn("Could not close the proxy servers", mock_warn.call_args.args[0])
@@ -243,9 +241,93 @@ class TestMitmLibraryGuards(unittest.TestCase):
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
             self._bound_master(mock_master)
             self.library.start_mitm_proxy()
-            mock_master.return_value.addons.get.return_value = None
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(None)
             self.library.stop_mitm_proxy()
         self.assertIsNone(self.library.proxy_master)
+    def test_get_proxy_address_before_start_raises_readable_error(self):
+        with self.assertRaises(RuntimeError) as context:
+            self.library.get_proxy_address()
+        self.assertIn("Start Mitm Proxy", str(context.exception))
+
+    def test_get_proxy_address_returns_the_bound_address(self):
+        """The address must come from the proxy, so port 0 reports the real port."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master, port=8123)
+            self.library.start_mitm_proxy(listen_port=0)
+            address = self.library.get_proxy_address()
+            self.library.stop_mitm_proxy()
+        self.assertEqual(address.host, "127.0.0.1")
+        self.assertEqual(address.port, 8123)
+        self.assertEqual(address.url, "http://127.0.0.1:8123")
+
+    def test_get_proxy_address_reports_the_first_of_several(self):
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
+                listen_addrs=lambda: [("127.0.0.1", 8123), ("::1", 8124)],
+                servers=SimpleNamespace(update=_noop_update),
+            ))
+            stop = threading.Event()
+            mock_master.return_value.shutdown.side_effect = stop.set
+            mock_master.return_value.run = lambda: _runs_until_stopped(stop)
+            self.library.start_mitm_proxy()
+            with patch.object(logger, "info") as mock_info:
+                address = self.library.get_proxy_address()
+            self.library.stop_mitm_proxy()
+        self.assertEqual(address.port, 8123)
+        logged = " ".join(call.args[0] for call in mock_info.call_args_list)
+        self.assertIn("returning the first", logged)
+
+    def test_get_proxy_address_without_a_listening_address_raises(self):
+        """A master that is up but bound to nothing must not report a made-up address."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
+                listen_addrs=list,
+                servers=SimpleNamespace(update=_noop_update),
+            ))
+            with self.assertRaises(RuntimeError) as context:
+                self.library.get_proxy_address()
+            self.library.stop_mitm_proxy()
+        self.assertIn("not listening", str(context.exception))
+
+    def test_failed_start_clears_the_request_logger(self):
+        """A logger left behind would belong to a proxy that is not running."""
+        with (
+            patch("MitmLibrary.dump.DumpMaster") as mock_master,
+            patch("MitmLibrary.proxy_controller.STARTUP_TIMEOUT", 0.3),
+        ):
+            mock_master.return_value.addons.get.side_effect = _addons_by_name(SimpleNamespace(
+                listen_addrs=list,
+                servers=SimpleNamespace(update=_noop_update),
+            ))
+            mock_master.return_value.run = _never_binds
+            with self.assertRaises(RuntimeError):
+                self.library.start_mitm_proxy()
+        self.assertIsNone(self.library.request_logger)
+
+    def test_controller_shutdown_stops_a_running_proxy_and_its_thread(self):
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            master = self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+            self.library.controller.shutdown()
+        master.shutdown.assert_called_once()
+        self.assertIsNone(self.library.proxy_master)
+        self.assertFalse(self.library.loop_handler.is_alive())
+
+
+def _addons_by_name(proxyserver):
+    """Fakes mitmproxy's addon lookup, which answers per name.
+
+    The library asks for "proxyserver" and for "errorcheck", and handing the proxyserver
+    stand-in to both would give it something that is not an errorcheck addon.
+    """
+
+    def get(name):
+        return proxyserver if name == "proxyserver" else None
+
+    return get
+
 
 async def _returns_immediately():
     return None

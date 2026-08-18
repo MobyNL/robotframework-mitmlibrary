@@ -12,39 +12,16 @@ Framework tests, enabling you to simulate various network conditions and test yo
 applications in a more realistic and controlled environment.
 """
 
-import asyncio
-import logging
-import time
-from concurrent.futures import Future, TimeoutError as FutureTimeoutError
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional, Sequence
 
-from mitmproxy import options
 from mitmproxy.tools import dump
 from robot.api import logger
 from robot.api.deco import keyword, library, not_keyword
+from robot.utils import DotDict
 
-from MitmLibrary.async_loop_thread import AsyncLoopThread
+from MitmLibrary.proxy_controller import ProxyController
 from MitmLibrary.request_logger import RequestLogger
 from MitmLibrary.version import VERSION
-
-STARTUP_TIMEOUT = 10
-SHUTDOWN_TIMEOUT = 10
-STARTUP_POLL_INTERVAL = 0.05
-
-
-class StartupErrorCollector(logging.Handler):
-    """Collects the error messages mitmproxy logs while the proxy is starting.
-
-    mitmproxy reports bind failures through the logging module rather than by raising,
-    so this is the only way to tell the user *why* the proxy did not start.
-    """
-
-    def __init__(self) -> None:
-        super().__init__(level=logging.ERROR)
-        self.messages: List[str] = []
-
-    def emit(self, record: logging.LogRecord) -> None:
-        self.messages.append(record.getMessage())
 
 
 @library(scope="SUITE", version=VERSION, auto_keywords=True)
@@ -98,14 +75,22 @@ class MitmLibrary:
         """
         Initializes the MitmLibrary instance.
 
-        This constructor initializes the proxy_master and request_logger instances used for managing the proxy server.
+        This constructor initializes the proxy controller and request_logger instances used
+        for managing the proxy server.
         """
-        self.proxy_master: Optional[dump.DumpMaster] = None
+        self.controller: ProxyController = ProxyController()
         self.request_logger: Optional[RequestLogger] = None
-        self.proxy_future: Optional[Future] = None
         self.log_to_console: bool = True
-        self.loop_handler: AsyncLoopThread = AsyncLoopThread()
-        self.loop_handler.start()
+
+    @property
+    def proxy_master(self) -> Optional[dump.DumpMaster]:
+        """The running mitmproxy master, or None when no proxy is running."""
+        return self.controller.master
+
+    @property
+    def loop_handler(self) -> Any:
+        """The thread the proxy's event loop runs on."""
+        return self.controller.loop_handler
 
     @not_keyword
     def _require_proxy(self) -> RequestLogger:
@@ -146,140 +131,66 @@ class MitmLibrary:
         See the 'Mitm Certificates' section in the documentation for more information.
         """
         self.log_to_console = log_to_console
-        option_kwargs: Dict[str, Any] = {
-            "listen_host": listen_host,
-            "listen_port": listen_port,
-            "ssl_insecure": ssl_insecure,
-        }
-        if certificates_directory is not None:
-            option_kwargs["confdir"] = certificates_directory
-        opts = options.Options(**option_kwargs)
-        # Bind the master to the loop it will actually run on. Without this it binds
-        # to whatever loop happens to be running on the calling thread, which is not
-        # the loop that `run()` is scheduled on below.
-        self.proxy_master = dump.DumpMaster(
-            opts,
-            loop=self.loop_handler.loop,
-            with_termlog=False,
-            with_dumper=False,
-        )
-        self.request_logger = RequestLogger(self.proxy_master, log_to_console)
-        self.proxy_master.addons.add(self.request_logger)
-        collector = StartupErrorCollector()
-        logging.getLogger().addHandler(collector)
         try:
-            self.proxy_future = asyncio.run_coroutine_threadsafe(
-                self.proxy_master.run(), self.loop_handler.loop
+            self.controller.start(
+                listen_host,
+                listen_port,
+                certificates_directory,
+                ssl_insecure,
+                self._build_addons,
             )
-            self._fail_on_startup_error(
-                listen_host, listen_port, collector, self.proxy_future, self.proxy_master
-            )
-        finally:
-            logging.getLogger().removeHandler(collector)
+        except Exception:
+            # The controller has already discarded the master it could not start. The
+            # addon it was built with has to go with it, or the next keyword would talk
+            # to a request logger belonging to a proxy that is not running.
+            self.request_logger = None
+            raise
 
     @not_keyword
-    def _fail_on_startup_error(
-        self,
-        listen_host: str,
-        listen_port: int,
-        collector: "StartupErrorCollector",
-        proxy_future: Future,
-        proxy_master: dump.DumpMaster,
-    ) -> None:
-        """Raises if the proxy did not manage to bind its listening address.
-
-        mitmproxy does not propagate bind failures out of `run()`: it logs the error and
-        keeps the master alive with no listening address, and `run_coroutine_threadsafe`
-        hides the failure as well. Without this check a suite would run green against a
-        proxy that never came up.
-        """
-        deadline = time.monotonic() + STARTUP_TIMEOUT
-        while time.monotonic() < deadline:
-            if proxy_future.done():
-                error = proxy_future.exception()
-                self._discard_proxy(wait=False)
-                raise RuntimeError(
-                    f"The proxy on {listen_host}:{listen_port} stopped immediately "
-                    f"after starting: {error or 'no error reported'}"
-                )
-            if self._listening_addresses(proxy_master):
-                return
-            if collector.messages:
-                break
-            time.sleep(STARTUP_POLL_INTERVAL)
-
-        reported = "; ".join(collector.messages) or "no error reported"
-        self._discard_proxy(wait=False)
-        raise RuntimeError(
-            f"Could not start the proxy on {listen_host}:{listen_port}: {reported}"
-        )
-
-    @not_keyword
-    def _listening_addresses(self, proxy_master: Optional[dump.DumpMaster] = None) -> list:
-        """Returns the addresses the proxy server addon is currently bound to."""
-        master = proxy_master or self.proxy_master
-        if master is None:
-            return []
-        proxyserver = master.addons.get("proxyserver")
-        return proxyserver.listen_addrs() if proxyserver else []
-
-    @not_keyword
-    def _discard_proxy(self, wait: bool = True) -> None:
-        """Shuts the proxy down and waits until it has actually finished.
-
-        `Master.shutdown()` only signals the event loop; the listening socket is closed
-        later, when `Master.run()` reaches its cleanup. Returning before that happens
-        would leave the port occupied, so restarting the proxy on the same port fails.
-
-        Pass `wait=False` for a proxy that never came up: there is no socket of ours to
-        release, and a master stuck in a failed startup never completes its future.
-        """
-        if self.proxy_master is not None:
-            if wait:
-                self._close_servers()
-            self.proxy_master.shutdown()
-        if self.proxy_future is not None and wait:
-            try:
-                self.proxy_future.result(timeout=SHUTDOWN_TIMEOUT)
-            except FutureTimeoutError:
-                logger.warn(
-                    f"The proxy did not shut down within {SHUTDOWN_TIMEOUT} seconds; "
-                    f"its port may still be in use."
-                )
-            except Exception as error:  # pylint: disable=broad-exception-caught
-                logger.info(f"The proxy stopped with an error: {error}")
-        self.proxy_master = None
-        self.request_logger = None
-        self.proxy_future = None
-
-    @not_keyword
-    def _close_servers(self) -> None:
-        """Closes the listening sockets held by the proxyserver addon.
-
-        The addon has no teardown hook of its own, and shutting the master down does not
-        close its servers, so without this the port stays bound after the proxy stops.
-        """
-        if self.proxy_master is None:
-            return
-        proxyserver = self.proxy_master.addons.get("proxyserver")
-        if proxyserver is None:
-            return
-        try:
-            asyncio.run_coroutine_threadsafe(
-                proxyserver.servers.update([]), self.loop_handler.loop
-            ).result(timeout=SHUTDOWN_TIMEOUT)
-        except Exception as error:  # pylint: disable=broad-exception-caught
-            logger.warn(f"Could not close the proxy servers cleanly: {error}")
+    def _build_addons(self, master: dump.DumpMaster) -> Sequence[Any]:
+        """Builds the addons the proxy runs with, once its master exists."""
+        self.request_logger = RequestLogger(master, self.log_to_console)
+        return [self.request_logger]
 
     @keyword
     def stop_mitm_proxy(self) -> None:
         """Stops the proxy and waits for it to release its port.
 
         Does nothing when no proxy is running."""
-        if self.proxy_master is None:
+        if not self.controller.is_running:
             logger.info("No proxy is running, nothing to stop.")
             return
-        self._discard_proxy()
+        self.controller.discard()
+        self.request_logger = None
+
+    @keyword
+    def get_proxy_address(self) -> DotDict:
+        """Returns the address the proxy is actually listening on.
+
+        The result is a dictionary with `host`, `port` and `url`. The address is read from
+        the running proxy rather than echoed back from ``Start Mitm Proxy``, so it is the
+        real one: passing port ``0`` lets the operating system pick a free port, and this
+        keyword is how you find out which. That is what makes it safe to run several
+        suites in parallel without them competing for port 8080.
+
+        Fails if no proxy is running.
+
+        Example:
+        | Start Mitm Proxy    127.0.0.1    0
+        | ${address}    Get Proxy Address
+        | Log    The proxy is on ${address.url}
+        """
+        if not self.controller.is_running:
+            raise RuntimeError(
+                "No proxy is running. Call 'Start Mitm Proxy' before this keyword."
+            )
+        addresses = self.controller.listen_addresses()
+        if not addresses:
+            raise RuntimeError("The proxy is running but is not listening on any address.")
+        if len(addresses) > 1:
+            logger.info(f"The proxy is listening on {addresses}; returning the first.")
+        host, port = addresses[0][0], addresses[0][1]
+        return DotDict({"host": host, "port": port, "url": f"http://{host}:{port}"})
 
     @keyword
     def add_to_blocklist(self, url: str) -> None:

@@ -5,6 +5,7 @@ way the library talks to mitmproxy itself. These tests exercise that boundary fo
 both of the failure modes below were live bugs that a mocked DumpMaster hid.
 """
 
+import logging
 import shutil
 import socket
 import tempfile
@@ -28,16 +29,13 @@ class TestProxyIntegration(unittest.TestCase):
         self.port = free_port()
 
     def tearDown(self):
-        self.library.stop_mitm_proxy()
-        loop = self.library.loop_handler.loop
-        loop.call_soon_threadsafe(loop.stop)
-        self.library.loop_handler.join(timeout=5)
+        self.library.controller.shutdown()
 
     def test_starts_without_a_certificates_directory(self):
         """`Options` rejects confdir=None, so the default call must omit the key."""
         self.library.start_mitm_proxy(listen_port=self.port)
         self.assertEqual(
-            self.library._listening_addresses(), [("127.0.0.1", self.port)]
+            self.library.controller.listen_addresses(), [("127.0.0.1", self.port)]
         )
 
     def test_mitmproxy_accepts_the_certificates_directory(self):
@@ -76,8 +74,45 @@ class TestProxyIntegration(unittest.TestCase):
         self.library.stop_mitm_proxy()
         self.library.start_mitm_proxy(listen_port=self.port)
         self.assertEqual(
-            self.library._listening_addresses(), [("127.0.0.1", self.port)]
+            self.library.controller.listen_addresses(), [("127.0.0.1", self.port)]
         )
+
+    def test_port_zero_reports_the_port_the_system_picked(self):
+        """Port 0 is only usable if the caller can find out what it was resolved to.
+
+        This is the whole justification for `Get Proxy Address`, and it cannot be proven
+        against a mocked master: only a real proxy resolves port 0 to a real port.
+        """
+        self.library.start_mitm_proxy(listen_port=0)
+        address = self.library.get_proxy_address()
+        self.assertEqual(address.host, "127.0.0.1")
+        self.assertNotEqual(address.port, 0)
+        self.assertEqual(address.url, f"http://127.0.0.1:{address.port}")
+
+        # The reported port must be the one that is actually bound, which binding it
+        # ourselves proves. Opening a connection would prove it too, but a client that
+        # connects and never sends a request makes the proxy log an error, and that
+        # error then belongs to no test in particular.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            with self.assertRaises(OSError):
+                sock.bind(("127.0.0.1", address.port))
+
+    def test_an_unrelated_logged_error_does_not_kill_the_proxy(self):
+        """mitmproxy's errorcheck addon exits the process when anything logged an error
+        while a master starts. It watches the root logger, so the error can come from a
+        proxy started earlier or from any other part of the test run, and the library
+        removes the addon rather than let an unrelated message take a proxy down.
+        """
+        logging.getLogger("some.other.component").error("unrelated failure")
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertEqual(
+            self.library.controller.listen_addresses(), [("127.0.0.1", self.port)]
+        )
+
+    def test_the_errorcheck_addon_is_removed(self):
+        """Pins the reason for the test above, so a revert is reported as itself."""
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertIsNone(self.library.proxy_master.addons.get("errorcheck"))
 
 
 if __name__ == "__main__":
