@@ -9,88 +9,139 @@ Library             ${CURDIR}/../resources/servers.py
 
 Suite Setup         Start Servers
 Suite Teardown      Stop Servers
-Test Setup          Clear All Proxy Items
-Test Teardown       Clear All Proxy Items
+Test Setup          Clear All Rules
+Test Teardown       Clear All Rules
 
 
 *** Test Cases ***
 Block A Website
+    [Documentation]    Reset mode drops the connection, so the navigation fails outright.
     Open Browser Through Proxy
-    Add To Blocklist    ${HTTP_HOST}
+    Block Requests    site    ${HTTP_HOST}    mode=RESET
     ${status}    Run Keyword And Return Status    Go To    ${HTTP_URL}/
-    Log Blocked Urls
+    Log Proxy Rules
     Should Not Be True    ${status}
 
-Block A Website On A Path Fragment
-    Add To Blocklist    /test_post
-    Log Blocked Urls
+Blocking Answers With A Status Code By Default
+    [Documentation]    The default is a real response, which every client reports alike.
+    Block Requests    posts    /test_post
+    Log Proxy Rules
+    Check POST Response    ${EMPTY}    ${403}
+
+Blocking Can Carry A Status Code And A Body
+    Block Requests    posts    /test_post    status_code=${503}    body=maintenance
+    Check POST Response    maintenance    ${503}
+
+Blocking In Reset Mode Drops The Connection
+    Block Requests    posts    /test_post    mode=RESET
     Run Keyword And Expect Error    *    POST On Session    alias=proxy    url=test_post/1
 
-Removing A Url From The Blocklist Unblocks It
-    Add To Blocklist    /test_post
-    Run Keyword And Expect Error    *    POST On Session    alias=proxy    url=test_post/1
-    Remove Url From Blocklist    /test_post
+Removing A Blocking Rule Unblocks It
+    Block Requests    posts    /test_post
+    Check POST Response    ${EMPTY}    ${403}
+    Remove Rule    posts
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
 
 Custom Response With Post And Custom Status Code
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
-    Add Custom Response Status Code    alias=number_post    url=test_post    status_code=${404}
-    Log Custom Status Items
+    Set Response Status    alias=number_post    url=test_post    status_code=${404}
+    Log Proxy Rules
     Check POST Response    <number_size>smaller than 2</number_size>    ${404}
 
 Custom Response With Post And Custom Body
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
-    Add Custom Response    alias=number_post    url=test_post    overwrite_body=<number_size>not_found</number_size>
-    Log Custom Response Items
+    Set Response    alias=number_post    url=test_post    body=<number_size>not_found</number_size>
+    Log Proxy Rules
     Check POST Response    <number_size>not_found</number_size>    ${200}
 
-Custom Response With Post And Custom StatusCode Using Add Custom Response
+Custom Response With Post And Custom StatusCode Using Set Response
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
-    Add Custom Response    alias=number_post    url=test_post    status_code=404
+    Set Response    alias=number_post    url=test_post    status_code=404
     Check POST Response    <number_size>smaller than 2</number_size>    ${404}
 
 Custom Response With Post And Custom Headers
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     VAR    &{new_headers}    Content-Type=application/json
-    Add Custom Response    alias=number_post    url=test_post    overwrite_headers=${new_headers}
+    Set Response    alias=number_post    url=test_post    headers=${new_headers}
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}    ${new_headers}
 
 Custom Response With Post And Full Custom Response
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     VAR    &{new_headers}    Content-Type=application/json
-    Add Custom Response
+    Set Response
     ...    alias=number_post
     ...    url=test_post
-    ...    overwrite_headers=${new_headers}
+    ...    headers=${new_headers}
     ...    status_code=${202}
-    ...    overwrite_body=<number_size>test successful</number_size>
+    ...    body=<number_size>test successful</number_size>
     Check POST Response    <number_size>test successful</number_size>    ${202}    ${new_headers}
 
-Reusing An Alias Replaces The Custom Response
-    Add Custom Response    alias=reused    url=test_post    overwrite_body=first
-    Add Custom Response    alias=reused    url=test_post    overwrite_body=second
+Reusing An Alias Replaces The Rule
+    Set Response    alias=reused    url=test_post    body=first
+    Set Response    alias=reused    url=test_post    body=second
     Check POST Response    second    ${200}
-    Remove Custom Response    reused
+    ${rules}    Get Proxy Rules
+    Length Should Be    ${rules}    1
+    Remove Rule    reused
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
 
 Removing A Custom Status Code Restores The Original
-    Add Custom Response Status Code    alias=number_post    url=test_post    status_code=${418}
+    Set Response Status    alias=number_post    url=test_post    status_code=${418}
     Check POST Response    <number_size>smaller than 2</number_size>    ${418}
-    Remove Custom Status Code    number_post
+    Remove Rule    number_post
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
 
-Clear All Proxy Items Removes Everything
-    Add To Blocklist    /never_called
-    Add Custom Response    alias=number_post    url=test_post    overwrite_body=stubbed
-    Add Custom Response Status Code    alias=status    url=test_post    status_code=${500}
+Removing A Rule That Does Not Exist Only Warns
+    [Documentation]    A teardown must not fail because the test never got that far.
+    Remove Rule    never_added
+
+Clear All Rules Removes Everything
+    Block Requests    never    /never_called
+    Set Response    alias=number_post    url=test_post    body=stubbed
+    Set Response Status    alias=status    url=test_post    status_code=${500}
     Check POST Response    stubbed    ${500}
-    Clear All Proxy Items
+    Clear All Rules
+    ${rules}    Get Proxy Rules
+    Should Be Empty    ${rules}
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+
+A Replacement And A Status Change Combine
+    [Documentation]    Both rules apply: the response is built, then its status is set.
+    ...    The old model let whichever ran last throw the other away.
+    Set Response    alias=body    url=test_post    body=combined
+    Set Response Status    alias=status    url=test_post    status_code=${418}
+    Check POST Response    combined    ${418}
+
+Rules Can Be Limited To A Number Of Requests
+    Set Response    alias=once    url=test_post    body=first only    times=1
+    Check POST Response    first only    ${200}
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    ${rules}    Get Proxy Rules
+    Should Be Equal As Integers    ${rules}[0][used]    1
+    Should Be Equal As Integers    ${rules}[0][remaining]    0
+
+Rules Can Be Limited To One Http Method
+    Set Response Status    alias=posts    url=test_    status_code=${418}    method=POST
+    Check POST Response    <number_size>smaller than 2</number_size>    ${418}
+    ${response}    GET On Session    alias=proxy    url=test_get    expected_status=any
+    Should Be Equal As Integers    ${response.status_code}    ${200}
+
+Rules Can Match On A Regular Expression
+    Set Response Status    alias=posts    url=/test_post/\\d+    status_code=${418}    match=REGEX
+    Check POST Response    <number_size>smaller than 2</number_size>    ${418}
+
+Rules Can Match On A Glob
+    Set Response Status    alias=posts    url=*/test_post/*    status_code=${418}    match=GLOB
+    Check POST Response    <number_size>smaller than 2</number_size>    ${418}
+
+An Invalid Regular Expression Fails Immediately
+    Run Keyword And Expect Error    *not a valid regular expression*
+    ...    Set Response Status    alias=bad    url=[unclosed    status_code=${418}    match=REGEX
 
 Delayed Response With Post
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     Add Response Delay    alias=delay    url=test_post    delay=5s
-    Log Delayed Responses
+    Log Proxy Rules
     ${start}    Get Time    epoch
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     ${end}    Get Time    epoch
@@ -99,29 +150,29 @@ Delayed Response With Post
 Invalid Response Delay Fails Immediately
     Run Keyword And Expect Error    ValueError: Invalid time string 'not-a-delay'.
     ...    Add Response Delay    alias=delay    url=test_post    delay=not-a-delay
-    Log Delayed Responses
+    Log Proxy Rules
 
 Custom Response Over Https
     Check HTTPS POST Response    <number_size>smaller than 2</number_size>    ${200}
-    Add Custom Response
+    Set Response
     ...    alias=secure
     ...    url=test_post
     ...    status_code=${203}
-    ...    overwrite_body=<number_size>intercepted over tls</number_size>
+    ...    body=<number_size>intercepted over tls</number_size>
     Check HTTPS POST Response    <number_size>intercepted over tls</number_size>    ${203}
 
 Block A Website Over Https
-    Add To Blocklist    /test_post
+    Block Requests    posts    /test_post    mode=RESET
     Run Keyword And Expect Error    *    POST On Session    alias=secure    url=test_post/1
 
 Turn Logging Off And On
-    Add To Blocklist    /test_post
+    Block Requests    posts    /test_post
     Turn Mitm Console Logging Off
-    Run Keyword And Expect Error    *    POST On Session    alias=proxy    url=test_post/1
+    Check POST Response    ${EMPTY}    ${403}
     Turn Mitm Console Logging On
-    Run Keyword And Expect Error    *    POST On Session    alias=proxy    url=test_post/1
+    Check POST Response    ${EMPTY}    ${403}
     # The blocking itself must keep working regardless of the logging setting.
-    Remove Url From Blocklist    /test_post
+    Remove Rule    posts
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
 
 
