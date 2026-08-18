@@ -100,6 +100,40 @@ class TestProxyIntegration(unittest.TestCase):
             with self.assertRaises(OSError):
                 sock.bind(("127.0.0.1", address.port))
 
+    def test_an_unrelated_error_during_startup_does_not_fail_the_keyword(self):
+        """A proxy stopped moments ago still logs from its own teardown, and the rest of
+        the test run logs too. Those must not be read as this proxy failing to bind: the
+        collector listens on the root logger, so it hears all of them.
+        """
+        noisy = threading.Thread(target=self._log_errors_briefly)
+        noisy.start()
+        self.addCleanup(noisy.join, 5)
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertEqual(
+            self.library.controller.listen_addresses(), [("127.0.0.1", self.port)]
+        )
+
+    @staticmethod
+    def _log_errors_briefly():
+        """Logs the kind of noise a stopping proxy leaves behind."""
+        deadline = time.monotonic() + 1
+        mitm_logger = logging.getLogger("mitmproxy.addons.something")
+        while time.monotonic() < deadline:
+            mitm_logger.error("Addon error: Event loop is closed")
+            logging.getLogger("asyncio").error("Task was destroyed but it is pending!")
+            time.sleep(0.02)
+
+    def test_a_real_bind_failure_is_still_reported(self):
+        """The noise filter must not swallow the failure it exists to report."""
+        blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        blocker.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        blocker.bind(("127.0.0.1", self.port))
+        blocker.listen(1)
+        self.addCleanup(blocker.close)
+        with self.assertRaises(RuntimeError) as context:
+            self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertIn("failed to listen", str(context.exception))
+
     def test_an_unrelated_logged_error_does_not_kill_the_proxy(self):
         """mitmproxy's errorcheck addon exits the process when anything logged an error
         while a master starts. It watches the root logger, so the error can come from a
@@ -168,6 +202,46 @@ class TestProxyIntegration(unittest.TestCase):
             opener.open(url, timeout=5).close()
         except Exception:  # noqa: BLE001 - the answer does not matter, only the record
             pass
+    def test_stopping_removes_the_mitmproxy_log_handler(self):
+        """mitmproxy leaves a root logger handler behind that outlives its own loop.
+
+        Every record logged afterwards is forwarded to a closed event loop, which raises
+        inside logging, and a run that starts several proxies accumulates one handler
+        per proxy. Nothing in the library logs enough to notice; a long suite does.
+        """
+        from mitmproxy import log as mitmproxy_log
+
+        def installed():
+            return [
+                handler
+                for handler in logging.getLogger().handlers
+                if isinstance(handler, mitmproxy_log.MitmLogHandler)
+            ]
+
+        before = len(installed())
+        self.library.start_mitm_proxy(listen_port=self.port)
+        self.assertGreater(len(installed()), before)
+        self.library.stop_mitm_proxy()
+        self.assertEqual(len(installed()), before)
+
+        # Logging after the proxy is gone must not raise into the logging machinery.
+        logging.getLogger("some.other.component").warning("after the proxy stopped")
+
+    def test_starting_several_proxies_does_not_pile_up_log_handlers(self):
+        from mitmproxy import log as mitmproxy_log
+
+        def installed():
+            return [
+                handler
+                for handler in logging.getLogger().handlers
+                if isinstance(handler, mitmproxy_log.MitmLogHandler)
+            ]
+
+        before = len(installed())
+        for _ in range(3):
+            self.library.start_mitm_proxy(listen_port=free_port())
+            self.library.stop_mitm_proxy()
+        self.assertEqual(len(installed()), before)
 
 
 if __name__ == "__main__":

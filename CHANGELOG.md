@@ -74,6 +74,14 @@ Two behaviour changes come with it:
   reported in assertion failures rather than hidden, so an assertion against a shortened
   recording cannot look complete. Requests that failed are recorded too, so a blocked
   call can be asserted on.
+- `Start Mitm Proxy` takes `mode`, so the proxy can be something other than a forward
+  proxy: `reverse:` puts it in front of one server, so a client needs no proxy settings
+  at all; `upstream:` sends everything on through another proxy, which is what a
+  corporate network needs; `transparent` and `socks5` are passed through as well. A mode
+  that cannot be understood fails the keyword with mitmproxy's own explanation, rather
+  than leaving the proxy to fail to start for an unstated reason.
+- `Start Mitm Proxy` takes `proxy_auth`, requiring clients to authenticate before the
+  proxy serves them.
 - `Get Proxy Rules` returns the loaded rules in the order they are applied.
 - Blocking rules have an alias, like every other rule, so they are removed the same way.
 - Rules survive a restart of the proxy: the registry outlives it, and only the addon

@@ -12,7 +12,7 @@ Framework tests, enabling you to simulate various network conditions and test yo
 applications in a more realistic and controlled environment.
 """
 
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from mitmproxy.tools import dump
 from robot.api import logger
@@ -115,6 +115,43 @@ class MitmLibrary:
     number dropped is reported in the failure message of an assertion rather than being
     hidden. A body longer than the second cap is shortened, and the recorded request says
     so.
+    = Proxy modes =
+    By default the proxy is a normal forward proxy: a client is configured to send its
+    traffic through it. `mode` on `Start Mitm Proxy` changes that, and takes either one
+    mode or a list of them.
+
+    - `regular`: a forward proxy. The default.
+    - `reverse:http://host:port`: the proxy stands in front of one server. Clients talk
+      to the proxy directly, as if it were that server, so nothing needs to be configured
+      to use a proxy at all.
+    - `upstream:http://host:port`: a forward proxy that passes everything on to another
+      proxy. This is what a corporate network needs, where the machine running the tests
+      may not reach the internet on its own. Rules and recording still apply here, on
+      this proxy; what the proxy further up the chain makes of the traffic is its own
+      business, and it does not necessarily see it as separate requests.
+    - `transparent`: traffic is routed to the proxy by the network itself. Needs the
+      operating system to be set up for it.
+    - `socks5`: a SOCKS5 proxy rather than an HTTP one.
+
+    A mode may be followed by `@host:port` to give it its own listening address, which
+    overrides `listen_host` and `listen_port`. `Get Proxy Address` reports where the
+    proxy actually ended up listening, which is why it reads that from the proxy rather
+    than repeating the arguments back.
+
+    A specification that cannot be understood fails `Start Mitm Proxy` with mitmproxy's
+    own explanation, rather than leaving the proxy to fail to start for an unstated
+    reason.
+
+    `transparent` and `socks5` are passed through to mitmproxy but are not exercised by
+    this library's own tests, because they need the operating system or a client
+    configured for them.
+
+    == Example ==
+    | # Stand in front of a service, so a client needs no proxy settings at all
+    | Start Mitm Proxy    mode=reverse:http://127.0.0.1:5000
+
+    | # Send everything on through the network's own proxy
+    | Start Mitm Proxy    mode=upstream:http://corporate-proxy:3128
 
     = Mitm Certificates =
     To test with SSL verification or use a browser without ignoring certificates, you need to set up
@@ -188,6 +225,8 @@ class MitmLibrary:
         record: bool = False,
         record_limit: int = DEFAULT_LIMIT,
         record_body_limit: int = DEFAULT_BODY_LIMIT,
+        mode: Optional[Union[str, List[str]]] = None,
+        proxy_auth: Optional[str] = None,
     ) -> None:
         """
         Starts a proxy at the given host and port.
@@ -205,11 +244,19 @@ class MitmLibrary:
           had been called. Off by default; see the `Recording` section.
         - record_limit: How many requests to keep when recording.
         - record_body_limit: How many bytes of each body to keep when recording.
+        - mode: How the proxy handles the traffic it receives. A single mode or a list of
+          them. Defaults to a normal forward proxy. See the `Proxy modes` section.
+        - proxy_auth: Require clients to authenticate before the proxy serves them.
+          `username:password` for one account, `any` to accept any combination, or
+          `@path/to/htpasswd` for an Apache htpasswd file.
 
-        Fails if the proxy cannot be started, for example when the port is already in use.
+        Fails if the proxy cannot be started, for example when the port is already in use,
+        or if a mode cannot be understood.
 
         Example:
         | Start Mitm Proxy    192.168.1.100    8888    /path/to/certificates    True
+        | Start Mitm Proxy    mode=reverse:http://127.0.0.1:5000
+        | Start Mitm Proxy    proxy_auth=tester:secret
 
         See the 'Mitm Certificates' section in the documentation for more information.
         """
@@ -223,6 +270,8 @@ class MitmLibrary:
                 certificates_directory,
                 ssl_insecure,
                 self._build_addons,
+                mode,
+                proxy_auth,
             )
         except Exception:
             # The controller has already discarded the master it could not start. The
