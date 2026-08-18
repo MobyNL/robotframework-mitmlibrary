@@ -27,8 +27,14 @@ from MitmLibrary.rules import (
     Action,
     BlockAction,
     BlockMode,
+    BodyAction,
     DelayAction,
+    HeadersAction,
+    RedirectAction,
+    RequestBodyAction,
+    RequestHeadersAction,
     ResponseAction,
+    RewriteAction,
     Rule,
     RuleRegistry,
     StatusAction,
@@ -398,6 +404,202 @@ class MitmLibrary:
         self._require_proxy()
         self._add_rule(
             alias, url, method, match, times, DelayAction(timestr_to_secs(delay), delay)
+        )
+
+    @keyword
+    def set_response_headers(
+        self,
+        alias: str,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        remove: Optional[List[str]] = None,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Sets and removes named headers on matching responses.
+
+        Unlike `Set Response`, this merges: headers that are not named are left as they
+        were, so adding one header does not mean restating all the others.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `headers`: Headers to set. An existing header of the same name is replaced.
+        - `remove`: Names of headers to remove. Removal happens before setting, so a
+          header can be named in both to replace every copy of it with a single value.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | VAR    &{headers}    Cache-Control=no-store
+        | Set Response Headers    caching    /api    headers=${headers}
+        | Set Response Headers    cookies    /api    remove=['Set-Cookie']
+        """
+        self._require_proxy()
+        self._add_rule(
+            alias, url, method, match, times, HeadersAction(headers, remove)
+        )
+
+    @keyword
+    def set_response_body(
+        self,
+        alias: str,
+        url: str,
+        body: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Replaces the body of matching responses, keeping their status and headers.
+
+        The `content-length` header is updated to match the new body.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `body`: The body to answer with.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | Set Response Body    empty    /api/users    []
+        """
+        self._require_proxy()
+        self._add_rule(alias, url, method, match, times, BodyAction(body))
+
+    @keyword
+    def set_request_headers(
+        self,
+        alias: str,
+        url: str,
+        headers: Optional[Dict[str, str]] = None,
+        remove: Optional[List[str]] = None,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Sets and removes named headers on matching requests, before they are sent.
+
+        The request still reaches its destination; it arrives with the headers changed.
+        Useful for injecting an authorization header a test cannot obtain otherwise, or
+        for taking one away to see how the application under test copes.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `headers`: Headers to set. An existing header of the same name is replaced.
+        - `remove`: Names of headers to remove.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | VAR    &{headers}    Authorization=Bearer test-token
+        | Set Request Headers    auth    /api    headers=${headers}
+        """
+        self._require_proxy()
+        self._add_rule(
+            alias, url, method, match, times, RequestHeadersAction(headers, remove)
+        )
+
+    @keyword
+    def set_request_body(
+        self,
+        alias: str,
+        url: str,
+        body: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Replaces the body of matching requests, before they are sent.
+
+        The `content-length` header is updated to match the new body.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `body`: The body to send instead of the original one.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | Set Request Body    payload    /api/orders    {"id": 1}    method=POST
+        """
+        self._require_proxy()
+        self._add_rule(alias, url, method, match, times, RequestBodyAction(body))
+
+    @keyword
+    def rewrite_request_url(
+        self,
+        alias: str,
+        url: str,
+        target: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Sends matching requests to a different url entirely.
+
+        The whole url is replaced, so the path and query of the original request are not
+        kept. Use `Redirect Requests To Host` to send a request elsewhere while keeping
+        the rest of it.
+
+        The scheme, host, port and path are set together and the `Host` header is updated
+        with them, so the request that arrives is consistent.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `target`: The absolute url to send the request to instead.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | Rewrite Request Url    v2    /api/v1/users    https://example.com/api/v2/users
+        """
+        self._require_proxy()
+        self._add_rule(alias, url, method, match, times, RewriteAction(target))
+
+    @keyword
+    def redirect_requests_to_host(
+        self,
+        alias: str,
+        url: str,
+        host: str,
+        port: Optional[int] = None,
+        scheme: Optional[str] = None,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: int = 0,
+    ) -> None:
+        """Sends matching requests to a different host, keeping their path and query.
+
+        This is how a suite points an application at a local stub without changing the
+        application's configuration. The `Host` header is updated too, so the receiving
+        server is addressed by the name it actually answers to.
+
+        - `alias`: The handle for this rule. Reusing an alias replaces the rule that
+          already uses it.
+        - `url`: The pattern the request url is compared against. See `match`.
+        - `host`: The host to send the request to instead.
+        - `port`: The port to use. The original port is kept when not given.
+        - `scheme`: `http` or `https`. The original scheme is kept when not given.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: How often the rule may be applied. `0` means unlimited.
+
+        Example:
+        | Redirect Requests To Host    stub    api.example.com    127.0.0.1    port=8000
+        """
+        self._require_proxy()
+        self._add_rule(
+            alias, url, method, match, times, RedirectAction(host, port, scheme)
         )
 
     @keyword

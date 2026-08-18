@@ -16,7 +16,7 @@ import asyncio
 import threading
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 from mitmproxy import http
 from robot.api import logger
@@ -28,10 +28,19 @@ UNLIMITED = 0
 
 
 class Phase(Enum):
-    """Which mitmproxy hook a rule runs in."""
+    """Which mitmproxy hook a rule runs in.
+
+    The order matters when rules of both kinds are listed together: everything in the
+    request hook happens before anything in the response hook, because the request has
+    to be sent before there is an answer to change.
+    """
 
     REQUEST = "request"
     RESPONSE = "response"
+
+    @property
+    def order(self) -> int:
+        return 0 if self is Phase.REQUEST else 1
 
 
 class Priority(IntEnum):
@@ -203,6 +212,145 @@ class DelayAction(Action):
         return {"type": "delay", "delay": self.delay, "seconds": self.seconds}
 
 
+@dataclass(frozen=True)
+class HeadersAction(Action):
+    """Sets and removes named headers, leaving the rest of them alone.
+
+    Merging rather than replacing is what makes this useful next to `ResponseAction`:
+    adding one header should not mean restating every other header the response had.
+    """
+
+    set_headers: Optional[Dict[str, str]] = None
+    remove_headers: Optional[Sequence[str]] = None
+
+    phase = Phase.RESPONSE
+    priority = Priority.MUTATE
+
+    def _target(self, flow: http.HTTPFlow) -> Optional[http.Message]:
+        """The message this action edits."""
+        return flow.response if self.phase is Phase.RESPONSE else flow.request
+
+    def apply(self, flow: http.HTTPFlow) -> bool:
+        message = self._target(flow)
+        if message is None:
+            return False
+        for name in self.remove_headers or ():
+            # Headers can repeat, and pop removes every one of them, which is what a
+            # suite asking for a header to be gone means.
+            message.headers.pop(name, None)
+        for name, value in (self.set_headers or {}).items():
+            message.headers[name] = value
+        return False
+
+    def describe(self) -> Dict[str, Any]:
+        return {
+            "type": f"{self.phase.value}_headers",
+            "headers": self.set_headers,
+            "remove": list(self.remove_headers) if self.remove_headers else None,
+        }
+
+
+@dataclass(frozen=True)
+class RequestHeadersAction(HeadersAction):
+    """Sets and removes headers on the request before it is sent."""
+
+    phase = Phase.REQUEST
+    priority = Priority.MUTATE
+
+
+@dataclass(frozen=True)
+class BodyAction(Action):
+    """Replaces the body, leaving the status and headers alone."""
+
+    body: str = ""
+
+    phase = Phase.RESPONSE
+    priority = Priority.MUTATE
+
+    def _target(self, flow: http.HTTPFlow) -> Optional[http.Message]:
+        return flow.response if self.phase is Phase.RESPONSE else flow.request
+
+    def apply(self, flow: http.HTTPFlow) -> bool:
+        message = self._target(flow)
+        if message is None:
+            return False
+        # set_content recomputes content-length, which a body replacement needs: a
+        # declared length that no longer matches makes the message unreadable.
+        message.set_content(safe_str(self.body).encode("utf-8"))
+        return False
+
+    def describe(self) -> Dict[str, Any]:
+        return {"type": f"{self.phase.value}_body", "body": self.body}
+
+
+@dataclass(frozen=True)
+class RequestBodyAction(BodyAction):
+    """Replaces the body of the request before it is sent."""
+
+    phase = Phase.REQUEST
+    priority = Priority.MUTATE
+
+
+@dataclass(frozen=True)
+class RewriteAction(Action):
+    """Sends the request somewhere else entirely."""
+
+    target: str = ""
+
+    phase = Phase.REQUEST
+    priority = Priority.MUTATE
+
+    def apply(self, flow: http.HTTPFlow) -> bool:
+        # mitmproxy's url setter updates the scheme, host, port and path together, and
+        # rewrites the Host header with them, so the request stays consistent.
+        flow.request.url = self.target
+        return False
+
+    def describe(self) -> Dict[str, Any]:
+        return {"type": "rewrite", "target": self.target}
+
+
+@dataclass(frozen=True)
+class RedirectAction(Action):
+    """Sends the request to a different host, keeping its path and query."""
+
+    host: str = ""
+    port: Optional[int] = None
+    scheme: Optional[str] = None
+
+    phase = Phase.REQUEST
+    priority = Priority.MUTATE
+
+    def apply(self, flow: http.HTTPFlow) -> bool:
+        request = flow.request
+        if self.scheme is not None:
+            request.scheme = self.scheme
+        request.host = self.host
+        if self.port is not None:
+            request.port = self.port
+        # The host header carries the original name, which the new host would not
+        # recognise, and which mitmproxy only rewrites when the whole url is set.
+        if request.host_header is not None:
+            port = self.port if self.port is not None else request.port
+            request.host_header = (
+                self.host if _is_default_port(request.scheme, port) else f"{self.host}:{port}"
+            )
+        return False
+
+    def describe(self) -> Dict[str, Any]:
+        return {
+            "type": "redirect",
+            "host": self.host,
+            "port": self.port,
+            "scheme": self.scheme,
+        }
+
+
+def _is_default_port(scheme: str, port: int) -> bool:
+    """Whether the port is the one the scheme implies, and so left out of a host header."""
+    return (scheme == "http" and port == 80) or (scheme == "https" and port == 443)
+
+
 def _kill(flow: http.HTTPFlow) -> None:
     """Drops the connection, if mitmproxy still lets us.
 
@@ -310,7 +458,10 @@ class RuleRegistry:
                 for rule in self._rules.values()
                 if phase is None or rule.action.phase is phase
             ]
-        return sorted(rules, key=lambda rule: (rule.action.priority, rule.seq))
+        return sorted(
+            rules,
+            key=lambda rule: (rule.action.phase.order, rule.action.priority, rule.seq),
+        )
 
     def consume(self, rule: Rule) -> bool:
         """Claims one application of a rule. Returns False when it must not be applied.
