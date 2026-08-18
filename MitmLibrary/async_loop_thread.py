@@ -33,5 +33,5 @@ class AsyncLoopThread(Thread):
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_forever()
-        except Exception as e:
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Async loop thread error: {e}")  # Log the error message

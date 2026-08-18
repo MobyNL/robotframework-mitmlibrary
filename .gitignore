@@ -25,3 +25,9 @@ venv/*
 
 # other
 pypi_token.txt
+
+# build artifacts
+dist/
+build/
+.coverage
+htmlcov/

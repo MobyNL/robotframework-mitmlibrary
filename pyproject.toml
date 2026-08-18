@@ -1,9 +1,11 @@
 [tool.pylint.messages_control]
 max-line-length = 140
+# The package name is dictated by the Robot Framework library naming convention.
+disable = ["invalid-name"]
 
 [tool.poetry]
 name = "robotframework-mitmlibrary"
-version = "0.2.2"
+version = "0.3.0"
 description = "A Robot Framework library for managing and manipulating HTTP requests and responses using a man-in-the-middle proxy approach. It allows blocking requests, customizing responses, adding delays, and more."
 authors = ["Mark <markmoberts@gmail.com>"]
 license = "MIT"
@@ -12,21 +14,56 @@ homepage = "https://github.com/MobyNL/robotframework-mitmlibrary"
 repository = "https://github.com/MobyNL/robotframework-mitmlibrary"
 documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
 packages = [{ include = "MitmLibrary" }]
+keywords = [
+    "robotframework",
+    "automation",
+    "testautomation",
+    "testing",
+    "mitm",
+    "maninthemiddle",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Robot Framework :: Library",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Testing",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[tool.poetry.urls]
+"Keyword documentation" = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
+"Slack Channel" = "https://robotframework.slack.com/archives/C06M2J3J8AC"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-mitmproxy = "^12.0.1"
+mitmproxy = "^12.2.2"
 robotframework = "^7.1.1"
-wheel = "^0.45.1"
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.4"
+pytest = "^9.0.3"
 pytest-cov = "^6.0.0"
 coverage = "^7.6.10"
 robotframework-browser = "^19.1.2"
 robotframework-requests = "^0.9.7"
-setuptools = "^78.1.1"
+setuptools = "^83.0.0"
+pylint = "^4.0.0"
+
+[tool.pytest.ini_options]
+addopts = "-ra --cov=MitmLibrary --cov-report=term-missing --cov-fail-under=95"
+testpaths = ["tests"]
+# Third-party deprecation noise drowned out our own warnings, so it is silenced by
+# module while anything originating in MitmLibrary is promoted to an error.
+filterwarnings = [
+    "default",
+    "ignore::DeprecationWarning:ldap3.*",
+    "ignore::DeprecationWarning:mitmproxy.*",
+    "ignore:.*deprecated.*:Warning:mitmproxy.*",
+    "ignore:.*deprecated.*:Warning:pyparsing.*",
+    "error::DeprecationWarning:MitmLibrary.*",
+]
 
 [build-system]
 requires = ["poetry-core"]

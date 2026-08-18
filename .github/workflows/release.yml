@@ -5,29 +5,124 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: read
+
 jobs:
+  # A PyPI upload cannot be undone or replaced, so everything that can be checked is
+  # checked before the publish job runs.
+  verify:
+    name: verify the tag and run the tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --with dev
+
+      - name: Check the tag matches the package version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(poetry version --short)"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match pyproject.toml version $version." >&2
+            exit 1
+          fi
+          echo "Releasing version $version."
+
+      # GitHub Pages serves docs/ from main, so a stale file means the published
+      # keyword documentation does not describe the release being published.
+      - name: Check the keyword documentation is up to date
+        run: |
+          committed="$(mktemp)"
+          cp docs/MitmLibraryKeywords.html "$committed"
+          poetry run python -m robot.libdoc MitmLibrary docs/MitmLibraryKeywords.html
+          # libdoc stamps a generation time into the file, so compare without it.
+          strip='s/"generated": "[^"]*"/"generated": ""/'
+          if ! diff -q <(sed -E "$strip" "$committed") \
+                       <(sed -E "$strip" docs/MitmLibraryKeywords.html) >/dev/null; then
+            echo "docs/MitmLibraryKeywords.html is stale. Regenerate and commit it." >&2
+            exit 1
+          fi
+
+      - name: Run unit tests
+        run: poetry run pytest
+
+  build:
+    name: build the distributions
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Check the distributions render on PyPI
+        run: twine check --strict dist/*
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          retention-days: 7
+
   pypi-publish:
     name: upload release to PyPI
+    needs: build
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
       id-token: write
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Download the distributions
+        uses: actions/download-artifact@v4
         with:
-          python-version: '3.x'
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build wheel
-
-      - name: Build package
-        run: python -m build
+          name: distributions
+          path: dist/
 
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # release/v1
+
+  github-release:
+    name: publish the GitHub release
+    needs: pypi-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes

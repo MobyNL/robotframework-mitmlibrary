@@ -1,38 +1,44 @@
-# import asyncio
-# import io
-# from contextlib import redirect_stderr
-# from unittest import TestCase
-# from unittest.mock import Mock, patch
+import asyncio
+from unittest import TestCase
 
-# from MitmLibrary.async_loop_thread import AsyncLoopThread
+from MitmLibrary.async_loop_thread import AsyncLoopThread
 
 
-# class TestAsyncLoopThread(TestCase):
-#     def setUp(self):
-#         self.thread = AsyncLoopThread()
+class TestAsyncLoopThread(TestCase):
+    def setUp(self):
+        self.thread = AsyncLoopThread()
 
-#     def test_init(self):
-#         """Tests that the AsyncLoopThread initializes correctly."""
-#         self.assertIsInstance(self.thread.loop, asyncio.AbstractEventLoop)
+    def tearDown(self):
+        if self.thread.is_alive():
+            self.thread.loop.call_soon_threadsafe(self.thread.loop.stop)
+            self.thread.join(timeout=5)
+        if not self.thread.loop.is_closed():
+            self.thread.loop.close()
 
-#     def test_run_event_loop(self):
-#         """Tests that the run method starts the event loop."""
-#         mock_event_loop = Mock(wraps=asyncio.get_event_loop())
-#         with patch.object(asyncio, "new_event_loop", return_value=mock_event_loop):
-#             thread = AsyncLoopThread()
-#             thread.start()
-#             thread.join()
-#         mock_event_loop.run_forever.assert_called_once()
+    def test_init(self):
+        """The thread owns its own event loop and is a daemon."""
+        self.assertIsInstance(self.thread.loop, asyncio.AbstractEventLoop)
+        self.assertTrue(self.thread.daemon)
+        self.assertFalse(self.thread.loop.is_running())
 
-#     def test_run_event_loop_exception(self):
-#         """Tests that exceptions are logged during event loop execution."""
-#         with patch.object(
-#             asyncio, "new_event_loop", side_effect=RuntimeError("Test exception")
-#         ):
-#             thread = AsyncLoopThread()
-#             captured_logs = io.StringIO()
-#             with redirect_stderr(captured_logs):
-#                 thread.run()
-#             self.assertIn(
-#                 "Async loop thread error: Test exception", captured_logs.getvalue()
-#             )
+    def test_run_event_loop(self):
+        """Starting the thread runs the loop, and coroutines can be scheduled on it."""
+
+        async def answer():
+            return 42
+
+        self.thread.start()
+        future = asyncio.run_coroutine_threadsafe(answer(), self.thread.loop)
+        self.assertEqual(future.result(timeout=5), 42)
+        self.assertTrue(self.thread.loop.is_running())
+
+    def test_stopping_the_loop_ends_the_thread(self):
+        """Stopping the loop lets the thread terminate."""
+        self.thread.start()
+        # Wait for the loop to actually be running before stopping it.
+        asyncio.run_coroutine_threadsafe(asyncio.sleep(0), self.thread.loop).result(
+            timeout=5
+        )
+        self.thread.loop.call_soon_threadsafe(self.thread.loop.stop)
+        self.thread.join(timeout=5)
+        self.assertFalse(self.thread.is_alive())

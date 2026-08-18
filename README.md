@@ -57,6 +57,16 @@ Block and Delay Websites
 
 ```
 
+By default the proxy listens on `127.0.0.1:8080`. Pass a different host explicitly if the
+proxy must be reachable from another machine or container:
+
+```robotframework
+Start Mitm Proxy    0.0.0.0    8080
+```
+
+Be aware that `0.0.0.0` exposes an intercepting proxy on every network interface, so anyone
+who can reach the machine can route their traffic through it.
+
 
 ### Why use Mitm?
 Mitm allows manipulation on single browser instance, by using a proxy. It does not

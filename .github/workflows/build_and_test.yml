@@ -4,71 +4,120 @@ on:
   push:
     branches:
       - main
+  # Every pull request, whatever branch it targets, including from forks. Pushes to
+  # other branches are covered once a pull request exists; workflow_dispatch runs the
+  # suite on demand before that.
   pull_request:
-    branches:
-      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A pull request from a branch in this repo would otherwise start two identical runs,
+# and every new push would race the run it supersedes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  lint:
     runs-on: ubuntu-latest
-    
-    strategy:
-      matrix:
-        python-version: [3.12, 3.13]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --with dev
+
+      - name: Run pylint
+        run: poetry run pylint MitmLibrary
+
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools poetry wheel
+          pip install poetry
           poetry install
 
       - name: Build project
-        run: |
-          python setup.py sdist bdist_wheel
-  
+        run: poetry build
+
   test:
     needs: build
-    runs-on: ubuntu-latest
-    
+    runs-on: ${{ matrix.os }}
+
     strategy:
+      fail-fast: false
       matrix:
-        python-version: [3.12, 3.13]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.12', '3.13']
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
-          pip install setuptools poetry  
+          python -m pip install --upgrade pip
+          pip install poetry
           poetry install --with dev
 
       - name: Run unit tests
         run: poetry run pytest
 
+      # The acceptance suite needs a browser and two local servers. On the macOS
+      # runner a loopback connection to a listening Python process times out rather
+      # than connecting, so the suite runs on Linux only. The unit tests, including
+      # the ones that start a real proxy, still run everywhere.
       - name: Run rfbrowser init
+        if: runner.os == 'Linux'
         run: poetry run rfbrowser init
 
+      # The acceptance suite is measured too: it covers the real proxy paths that the
+      # unit tests can only reach through mocks.
       - name: Run acceptance tests
-        run: poetry run robot -d Logs atest/testcases
-      
+        if: runner.os == 'Linux'
+        run: poetry run coverage run --parallel-mode --source=MitmLibrary -m robot -d Logs atest/testcases
+
+      - name: Report acceptance coverage
+        if: always() && runner.os == 'Linux'
+        run: |
+          poetry run coverage combine
+          poetry run coverage report
+
       - name: Upload artifact
+        if: always() && runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           path: ./Logs
-          name: robot-test-results-${{ matrix.python-version }}
+          name: robot-test-results-${{ matrix.os }}-${{ matrix.python-version }}
           retention-days: 3

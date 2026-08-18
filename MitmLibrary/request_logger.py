@@ -1,19 +1,23 @@
 """
 This file defines the RequestLogger class, which is a core component of MitmLibrary.
 
-The RequestLogger class is responsible for intercepting and modifying HTTP requests and responses using the mitmproxy library. It provides various functionalities to manipulate network traffic during Robot Framework test execution.
+The RequestLogger class is responsible for intercepting and modifying HTTP requests and
+responses using the mitmproxy library. It provides various functionalities to manipulate
+network traffic during Robot Framework test execution.
 
 Here's a breakdown of the key functionalities offered by RequestLogger:
 
 * **Blocking Requests:** URLs can be added to a blocklist, causing the RequestLogger to block those requests with a 403 Forbidden response.
 * **Modifying Responses:** Custom responses can be configured to modify the response body, headers, or status code for specific URLs.
-* **Delaying Responses:** Responses can be delayed for a specified duration to simulate network latency or test application behavior under slow network conditions.
+* **Delaying Responses:** Responses can be delayed for a specified duration to simulate
+  network latency or test application behavior under slow network conditions.
 
-By leveraging these functionalities, MitmLibrary empowers you to control network traffic and create realistic testing scenarios within your Robot Framework tests.
+By leveraging these functionalities, MitmLibrary empowers you to control network traffic
+and create realistic testing scenarios within your Robot Framework tests.
 """
 
-from time import sleep as time_sleep
-from typing import List
+import asyncio
+from typing import List, Optional
 
 from mitmproxy import http
 from mitmproxy.tools import dump
@@ -50,9 +54,6 @@ class RequestLogger:
         self.custom_response_list: List[DotDict] = []
         self.custom_response_status: List[DotDict] = []
         self.response_delays_list: List[DotDict] = []
-        self.custom_status_urls: List[str] = []
-        self.custom_response_urls: List[str] = []
-        self.delay_response_urls: List[str] = []
 
     def request(self, flow: http.HTTPFlow) -> None:
         """
@@ -64,16 +65,16 @@ class RequestLogger:
         Args:
             flow: The HTTPFlow object representing the request.
         """
-        if any(url in flow.request.pretty_url for url in self.block_list):
-            for url in self.block_list:
-                if url in flow.request.pretty_host:
-                    flow.kill()
-                    logger.info(
-                        f"Blocked request for {flow.request.pretty_url}",
-                        also_console=self.log_to_console,
-                    )
+        for url in self.block_list:
+            if url in flow.request.pretty_url:
+                flow.kill()
+                logger.info(
+                    f"Blocked request for {flow.request.pretty_url}",
+                    also_console=self.log_to_console,
+                )
+                break
 
-    def response(self, flow: http.HTTPFlow) -> None:
+    async def response(self, flow: http.HTTPFlow) -> None:
         """
         Handles the response event.
 
@@ -84,39 +85,28 @@ class RequestLogger:
         Args:
             flow: The HTTPFlow object representing the request and response.
         """
-        self.custom_status_urls.extend(
-            status.url for status in self.custom_response_status
-        )
-        self.custom_response_urls.extend(
-            response.url for response in self.custom_response_list
-        )
-        self.delay_response_urls.extend(
-            response.url for response in self.response_delays_list
-        )
+        pretty_url = flow.request.pretty_url
 
-        if any(url in flow.request.pretty_url for url in self.custom_response_urls):
-            for custom_response in self.custom_response_list:
-                if custom_response.url in flow.request.pretty_url:
-                    self.update_request_with_custom_response(flow, custom_response)
+        for custom_response in self.custom_response_list:
+            if custom_response.url in pretty_url:
+                self.update_request_with_custom_response(flow, custom_response)
 
-        if any(url in flow.request.pretty_url for url in self.custom_status_urls):
-            for custom_status in self.custom_response_status:
+        for custom_status in self.custom_response_status:
+            if custom_status.url in pretty_url:
                 logger.info(
                     f"Updating status code for {custom_status.url} to {custom_status.status_code}",
                     also_console=self.log_to_console,
                 )
-                if custom_status.url in flow.request.pretty_url:
-                    flow.response.status_code = custom_status.status_code
+                flow.response.status_code = custom_status.status_code
 
-        if any(url in flow.request.pretty_url for url in self.delay_response_urls):
-            for response_delay in self.response_delays_list:
-                if response_delay.url in flow.request.pretty_url:
-                    logger.info(
-                        f"Delaying response for {response_delay.url} for "
-                        f"{response_delay.delay} seconds",
-                        also_console=self.log_to_console,
-                    )
-                    time_sleep(timestr_to_secs(response_delay.delay))
+        for response_delay in self.response_delays_list:
+            if response_delay.url in pretty_url:
+                logger.info(
+                    f"Delaying response for {response_delay.url} for "
+                    f"{response_delay.delay} seconds",
+                    also_console=self.log_to_console,
+                )
+                await asyncio.sleep(response_delay.delay_in_seconds)
 
     def add_to_blocklist(self, url: str) -> None:
         """
@@ -131,13 +121,29 @@ class RequestLogger:
         """
         Adds a response delay item to the response_delays_list.
 
+        The delay is converted here rather than while handling a response, so that an
+        invalid value fails this call instead of failing later inside the proxy, far
+        away from the keyword that caused it.
+
         Args:
             alias: A unique alias for this response delay.
             url: The URL to match for applying the response delay.
-            delay: The delay in seconds (can be a string like "1.5s").
+            delay: The delay, in Robot Framework time format (e.g. ``2``, ``1.5s``,
+                ``500 ms``, ``1 min``).
+
+        Raises:
+            ValueError: If the delay is not a valid Robot Framework time string.
         """
-        self.response_delays_list.append(
-            DotDict({"alias": alias, "url": url, "delay": delay})
+        self._add_item(
+            self.response_delays_list,
+            DotDict(
+                {
+                    "alias": alias,
+                    "url": url,
+                    "delay": delay,
+                    "delay_in_seconds": timestr_to_secs(delay),
+                }
+            ),
         )
 
     def clear_all_proxy_items(self) -> None:
@@ -173,13 +179,16 @@ class RequestLogger:
         Adds a custom response item to the custom_response_list.
 
         Args:
-            alias: A unique alias for this custom response.
+            alias: A unique alias for this custom response. Adding a second item with
+                the same alias replaces the first one.
             url: The URL to match for applying the custom response.
             overwrite_headers: A dictionary of headers to overwrite in the response.
-            overwrite_body: The custom response body to use.
+            overwrite_body: The custom response body to use. When None, the original
+                response body is kept.
             status_code: The HTTP status code to return in the response. Defaults to 200.
         """
-        self.custom_response_list.append(
+        self._add_item(
+            self.custom_response_list,
             DotDict(
                 {
                     "alias": alias,
@@ -188,7 +197,7 @@ class RequestLogger:
                     "body": overwrite_body,
                     "status_code": status_code,
                 }
-            )
+            ),
         )
 
     def remove_custom_response_item(self, alias: str) -> None:
@@ -198,26 +207,20 @@ class RequestLogger:
         Args:
             alias: The alias of the custom response to remove.
         """
-        try:
-            alias_index = next(
-                (
-                    index
-                    for (index, d) in enumerate(self.custom_response_list)
-                    if d["alias"] == alias
-                ),
-                None,
-            )
-            url_to_remove = self.custom_response_list[alias_index].url
-            self.custom_response_list.pop(alias_index)
-            self.custom_response_urls.remove(url_to_remove)
-        except (ValueError, IndexError):
+        alias_index = self._find_alias_index(self.custom_response_list, alias)
+        if alias_index is None:
             logger.warn(f"Custom response with alias '{alias}' not found.")
+            return
+        self.custom_response_list.pop(alias_index)
 
     def update_request_with_custom_response(
         self, flow: http.HTTPFlow, custom_response: DotDict
     ) -> None:
         """
         Updates the flow's response with the given custom response details.
+
+        Headers and body are only replaced when the custom response actually defines
+        them; otherwise the values of the original response are kept.
 
         Args:
             flow: The HTTPFlow object representing the request and response.
@@ -227,29 +230,68 @@ class RequestLogger:
             f"Trying to update response for {custom_response.url}",
             also_console=self.log_to_console,
         )
-        if custom_response.headers:
-            header_list = []
-            for key, value in custom_response.headers.items():
-                logger.info(key, also_console=self.log_to_console)
-                header_list.append((bytes(key, "utf-8"), bytes(value, "utf-8")))
-            headers = http.Headers(header_list)
-        elif hasattr(flow, "headers"):
-            headers = flow["headers"]
-        else:
-            headers = http.Headers()
+        headers = self._resolve_headers(flow, custom_response)
+        content = self._resolve_content(flow, custom_response)
         try:
             flow.response = http.Response.make(
-                custom_response.status_code, safe_str(custom_response.body), headers
+                custom_response.status_code, content, headers
             )
             logger.info(
                 f"Succesfully updated response for {custom_response.url}",
                 also_console=self.log_to_console,
             )
-        except Exception as e:  # Catch specific exceptions for better error handling
+        except (TypeError, ValueError) as error:
+            # logger.error has no 'also_console' argument; it already logs to console.
             logger.error(
-                f"Updating response for {custom_response.url} failed: {e}",
-                also_console=self.log_to_console,
+                f"Updating response for {custom_response.url} failed: {error}"
             )
+
+    def _resolve_headers(
+        self, flow: http.HTTPFlow, custom_response: DotDict
+    ) -> http.Headers:
+        """Returns the headers to use, preferring the custom ones when given."""
+        if custom_response.headers:
+            header_list = []
+            for key, value in custom_response.headers.items():
+                logger.info(key, also_console=self.log_to_console)
+                header_list.append((bytes(key, "utf-8"), bytes(value, "utf-8")))
+            return http.Headers(header_list)
+        if flow.response is not None:
+            return flow.response.headers
+        return http.Headers()
+
+    @staticmethod
+    def _resolve_content(flow: http.HTTPFlow, custom_response: DotDict):
+        """Returns the body to use, keeping the original one when none is given."""
+        if custom_response.body is not None:
+            return safe_str(custom_response.body)
+        if flow.response is not None:
+            return flow.response.content
+        return b""
+
+    def _add_item(self, items: List[DotDict], item: DotDict) -> None:
+        """Adds an item, replacing any existing item that uses the same alias.
+
+        An alias is the handle used to remove an item again, so allowing two items to
+        share one would make removal ambiguous.
+        """
+        existing_index = self._find_alias_index(items, item.alias)
+        if existing_index is None:
+            items.append(item)
+            return
+        logger.info(
+            f"Replacing the existing item with alias '{item.alias}'.",
+            also_console=self.log_to_console,
+        )
+        items[existing_index] = item
+
+    @staticmethod
+    def _find_alias_index(items: List[DotDict], alias: str) -> Optional[int]:
+        """Returns the index of the first item with the given alias, or None."""
+        return next(
+            (index for index, item in enumerate(items) if item["alias"] == alias),
+            None,
+        )
 
     def add_custom_response_status(
         self, alias: str, url: str, status_code: int
@@ -262,8 +304,9 @@ class RequestLogger:
             url: The URL to match for applying the custom response.
             status_code: The HTTP status code to return in the response.
         """
-        self.custom_response_status.append(
-            DotDict({"alias": alias, "url": url, "status_code": status_code})
+        self._add_item(
+            self.custom_response_status,
+            DotDict({"alias": alias, "url": url, "status_code": status_code}),
         )
 
     def remove_custom_status(self, alias: str) -> None:
@@ -273,18 +316,11 @@ class RequestLogger:
         Args:
             alias: The alias of the custom response to remove.
         """
-        try:
-            alias_index = next(
-                (
-                    index
-                    for (index, d) in enumerate(self.custom_response_status)
-                    if d["alias"] == alias
-                ),
-                None,
-            )
-            self.custom_response_status.pop(alias_index)
-        except ValueError:
-            logger.error(f"Custom response status with alias '{alias}' not found.")
+        alias_index = self._find_alias_index(self.custom_response_status, alias)
+        if alias_index is None:
+            logger.warn(f"Custom response status with alias '{alias}' not found.")
+            return
+        self.custom_response_status.pop(alias_index)
 
     def set_console_logging(self, value: bool) -> None:
         """
