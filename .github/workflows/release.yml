@@ -49,9 +49,15 @@ jobs:
           # libdoc stamps a generation time and the absolute path of the source file
           # into the output, both of which differ per machine. Compare without them.
           strip='s/"generated": "[^"]*"/"generated": ""/g; s#"source": "[^"]*"#"source": ""#g'
-          if ! diff -q <(sed -E "$strip" "$committed") \
-                       <(sed -E "$strip" docs/MitmLibraryKeywords.html) >/dev/null; then
+          sed -E "$strip" "$committed" > /tmp/committed.normalised
+          sed -E "$strip" docs/MitmLibraryKeywords.html > /tmp/regenerated.normalised
+          if ! diff -q /tmp/committed.normalised /tmp/regenerated.normalised >/dev/null; then
             echo "docs/MitmLibraryKeywords.html is stale. Regenerate and commit it." >&2
+            # Show what actually differs: a guard that fails without saying why is
+            # impossible to act on, and the difference may be environmental.
+            echo "--- differences (first 40 lines, truncated to 300 columns) ---" >&2
+            diff /tmp/committed.normalised /tmp/regenerated.normalised \
+              | head -40 | cut -c1-300 >&2
             exit 1
           fi
 
