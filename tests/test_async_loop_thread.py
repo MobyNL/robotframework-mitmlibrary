@@ -42,3 +42,24 @@ class TestAsyncLoopThread(TestCase):
         self.thread.loop.call_soon_threadsafe(self.thread.loop.stop)
         self.thread.join(timeout=5)
         self.assertFalse(self.thread.is_alive())
+
+    def test_stop_ends_the_thread_and_closes_the_loop(self):
+        self.thread.start()
+        asyncio.run_coroutine_threadsafe(asyncio.sleep(0), self.thread.loop).result(
+            timeout=5
+        )
+        self.thread.stop()
+        self.assertFalse(self.thread.is_alive())
+        self.assertTrue(self.thread.loop.is_closed())
+
+    def test_stop_is_idempotent(self):
+        """The library stops the thread on shutdown, which a suite may trigger twice."""
+        self.thread.start()
+        self.thread.stop()
+        self.thread.stop()  # must not raise on an already closed loop
+        self.assertTrue(self.thread.loop.is_closed())
+
+    def test_stop_on_a_thread_that_never_started(self):
+        """Constructing the library creates the loop; stopping before use must work."""
+        self.thread.stop()
+        self.assertTrue(self.thread.loop.is_closed())

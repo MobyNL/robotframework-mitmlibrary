@@ -35,3 +35,21 @@ class AsyncLoopThread(Thread):
             self.loop.run_forever()
         except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"Async loop thread error: {e}")  # Log the error message
+
+    def stop(self, timeout: float = 5) -> None:
+        """Stops the loop, waits for the thread to finish and closes the loop.
+
+        Safe to call more than once, and safe to call on a thread that was never started.
+        Closing the loop can raise on Windows, where the proactor loop objects to being
+        closed from another thread; that is swallowed because the thread is going away
+        regardless and there is nothing the caller could do about it.
+        """
+        if self.loop.is_closed():
+            return
+        self.loop.call_soon_threadsafe(self.loop.stop)
+        if self.is_alive():
+            self.join(timeout=timeout)
+        try:
+            self.loop.close()
+        except Exception as error:  # pylint: disable=broad-exception-caught
+            print(f"Async loop thread could not be closed: {error}")
