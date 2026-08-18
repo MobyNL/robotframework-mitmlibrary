@@ -34,14 +34,30 @@ class StartupErrorCollector(logging.Handler):
 
     mitmproxy reports bind failures through the logging module rather than by raising,
     so this is the only way to tell the user *why* the proxy did not start.
+
+    It listens on the root logger, which means it also hears errors that have nothing to
+    do with this proxy - a proxy stopped moments ago still logs from its own teardown,
+    and so does the rest of the test run. Only records from mitmproxy are kept, and only
+    those that report a failure to listen are treated as a reason to give up. Everything
+    else is remembered for the failure message but does not, by itself, fail a startup
+    that would otherwise have succeeded.
     """
+
+    #: What mitmproxy says when it cannot bind, which is the failure worth acting on.
+    BIND_FAILURE = "failed to listen"
 
     def __init__(self) -> None:
         super().__init__(level=logging.ERROR)
         self.messages: List[str] = []
+        self.bind_failures: List[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
-        self.messages.append(record.getMessage())
+        if not record.name.startswith("mitmproxy"):
+            return
+        message = record.getMessage()
+        self.messages.append(message)
+        if self.BIND_FAILURE in message:
+            self.bind_failures.append(message)
 
 
 class ProxyController:
@@ -187,11 +203,13 @@ class ProxyController:
                 )
             if self.listen_addresses(proxy_master):
                 return
-            if collector.messages:
+            if collector.bind_failures:
                 break
             time.sleep(STARTUP_POLL_INTERVAL)
 
-        reported = "; ".join(collector.messages) or "no error reported"
+        reported = "; ".join(
+            collector.bind_failures or collector.messages
+        ) or "no error reported"
         self.discard(wait=False)
         raise RuntimeError(
             f"Could not start the proxy on {listen_host}:{listen_port}: {reported}"
