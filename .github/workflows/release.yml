@@ -9,11 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
-      # Declaring any permission replaces the whole default set, so contents: read has
-      # to be named too. Without it the token cannot clone a private repository and
-      # checkout fails with "repository not found", which reads like a wrong URL rather
-      # than a missing scope.
-      contents: read
+      # Declaring any permission replaces the whole default set, so contents has to be
+      # named too. Without it the token cannot clone a private repository and checkout
+      # fails with "repository not found", which reads like a wrong URL rather than a
+      # missing scope. It is write rather than read because this job also creates the
+      # GitHub release for the tag.
+      contents: write
       # Trusted publishing, so no token is stored in the repository.
       id-token: write
     steps:
@@ -38,4 +39,38 @@ jobs:
       - name: Build
         run: poetry build
 
+      - name: Take the release notes from the changelog
+        # A release with no notes is a release nobody can read, and the changelog already
+        # says what changed. This lifts the section for this version out of it.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          python - "$version" <<'PY' > release-notes.md
+          import re, sys
+          from pathlib import Path
+
+          version = sys.argv[1]
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          # Everything between this version's heading and the next version heading.
+          match = re.search(
+              rf"^## \[{re.escape(version)}\][^\n]*\n(.*?)(?=^## \[|\Z)",
+              changelog,
+              re.MULTILINE | re.DOTALL,
+          )
+          if match is None:
+              raise SystemExit(f"CHANGELOG.md has no section for {version}.")
+          print(match.group(1).strip())
+          PY
+
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # After publishing, so a release is never announced for a version that failed to
+        # reach PyPI.
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "${GITHUB_REF_NAME#v}" \
+            --notes-file release-notes.md \
+            --verify-tag \
+            dist/*

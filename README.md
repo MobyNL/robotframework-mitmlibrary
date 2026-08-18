@@ -13,10 +13,19 @@ If you need help, have suggestions or want to discuss anything, feel free to con
 
 ## Features
 
-- Interact with MITM proxy using Robot Framework keywords.
-- Manipulate network traffic for testing purposes.
-- Easily simulate different network conditions and responses.
-- Integrate MITM proxy capabilities into your existing Robot Framework tests.
+- **Change what comes back.** Replace a response, or only its status, headers or body,
+  for requests matching a url, a method, or a regular expression.
+- **Change what goes out.** Add or remove request headers, replace a request body, or
+  send a request to a different url or host entirely.
+- **Assert on what was sent.** Record the traffic that passed through and ask whether a
+  request was made, how often, and with what — the half of testing a proxy is usually not
+  used for.
+- **Break things on purpose.** Block a request, drop a connection, hold a request until
+  the client gives up, or cut a response short while it still claims its full length.
+- **Sit wherever the traffic is.** A forward proxy by default, or in front of a service,
+  or chained through the network's own proxy.
+
+Every rule is addressed by an alias, matched the same way, and removed the same way.
 
 ## Installation
 
@@ -25,6 +34,8 @@ If you need help, have suggestions or want to discuss anything, feel free to con
 ```
 pip install robotframework-mitmlibrary
 ```
+
+Requires Python 3.12 or newer, which is mitmproxy's own floor.
 
 
 ## Usage
@@ -165,17 +176,52 @@ mitm. Follow the guide on the
 [Mitm website](https://docs.mitmproxy.org/stable/concepts-certificates/)
 
 ## Documentation
-For detailed information on the available keywords and usage examples, please refer to the [Keyword Documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
+
+The [keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
+describes every keyword, its arguments and examples.
+
+It is published per version, so you can read the documentation for the version you
+actually have installed rather than for whatever is newest:
+
+- [latest release](https://mobynl.github.io/robotframework-mitmlibrary/latest/MitmLibraryKeywords.html)
+- [all versions](https://mobynl.github.io/robotframework-mitmlibrary/)
+- [current main, unreleased](https://mobynl.github.io/robotframework-mitmlibrary/dev/MitmLibraryKeywords.html)
 
 ## API stability
 
-The keyword surface is **not yet stable**. Keyword names, argument names and their order
-may still change while the library is on 0.x, and the [CHANGELOG](CHANGELOG.md) records
-those changes.
+From 1.0.0 onwards the keyword surface is stable:
 
-1.0.0 fixes the surface: it reworks the keywords once, deliberately and with a documented
-migration path, and from that release onwards names and argument order will not change
-within 1.x.
+- Keyword names, argument names and their order will not change in a 1.x release.
+- New arguments are only ever added at the end, with defaults, so existing calls keep
+  working whether they pass arguments positionally or by name.
+- The rule model is part of that promise, not just the signatures: how patterns are
+  matched, the order in which several matching rules are applied, and what `times` means
+  will not change either.
+
+Anything not listed above is internal and may change: module layout, class names, and
+everything with a leading underscore. Import keywords through Robot Framework rather than
+calling into the package directly, and none of that will reach you.
+
+Breaking changes wait for 2.0 and are recorded in the [CHANGELOG](CHANGELOG.md).
+
+### Migrating from 0.3.0
+
+1.0.0 reworked the keywords once so that every kind of rule is addressed the same way.
+The [CHANGELOG](CHANGELOG.md) has the full table; in short:
+
+| Before | Now |
+| --- | --- |
+| `Add To Blocklist    url` | `Block Requests    alias    url` |
+| `Add Custom Response    alias    url    overwrite_headers=    overwrite_body=` | `Set Response    alias    url    headers=    body=` |
+| `Add Custom Response Status Code` | `Set Response Status` |
+| `Remove Url From Blocklist`, `Remove Custom Response`, `Remove Custom Status Code` | `Remove Rule    alias` |
+| `Clear All Proxy Items` | `Clear All Rules` |
+| the four `Log ...` keywords | `Log Proxy Rules` |
+
+Two behaviour changes come with it: a blocked request is answered with `403` rather than
+having its connection dropped (`mode=RESET` restores the old behaviour), and when several
+rules match one request all of them apply, in a defined order, instead of the last one
+silently winning.
 
 ## Contributing
 Contributions are welcome! If you encounter any issues, have suggestions for improvements, or would like to add new features, feel free to open an issue or submit a pull request.
