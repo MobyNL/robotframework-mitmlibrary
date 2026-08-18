@@ -78,6 +78,24 @@ All matching rules are applied. A rule that blocks a request ends it and nothing
 runs; otherwise `Set Response` runs before rules that change part of a response, which run
 before delays, so combinations behave predictably rather than overwriting each other.
 
+### Simulating failures
+
+Most rules make a request succeed differently. These make it fail the way a network does:
+
+```robotframework
+Simulate Timeout                hang   /api/orders   hold=30s
+Simulate Truncated Response     cut    /api/orders   keep_bytes=10
+Block Requests                  drop   /api/orders   mode=RESET
+```
+
+How a client reports any of these depends on the HTTP library it uses, so assert that the
+request failed rather than on the particular error.
+
+Bandwidth throttling is not supported: mitmproxy hands a response body to a synchronous
+callback with no way to wait between chunks, so the only implementable version would delay
+the whole body and deliver it in one piece — which is what `Add Response Delay` already
+does, honestly named.
+
 ### Recording
 
 The proxy can also remember what went through it, so a suite can assert on what the

@@ -231,6 +231,35 @@ Waiting For A Request That Never Comes Fails
 Recording Keywords Explain Themselves When Recording Is Off
     Run Keyword And Expect Error    *Start Recording*    Get Recorded Requests
 
+A Held Request Runs Into The Client's Own Timeout
+    [Documentation]    How a client reports this differs per HTTP library, so this asserts
+    ...    that the request failed rather than on a particular error. The hold is far
+    ...    longer than the client's timeout, so the client is the one that gives up and
+    ...    the test does not depend on the two being close together.
+    Simulate Timeout    hang    /test_post    hold=30s
+    ${start}    Get Time    epoch
+    Run Keyword And Expect Error    *
+    ...    POST On Session    alias=proxy    url=test_post/1    timeout=2
+    ${end}    Get Time    epoch
+    # It failed because it waited, not because it was refused outright.
+    Should Be True    ${end} - ${start} >= 2    The request failed without waiting
+
+Other Traffic Keeps Flowing While A Request Is Held
+    [Documentation]    Holding must not stall the proxy for everything else.
+    Simulate Timeout    hang    /test_get    hold=30s
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+
+A Truncated Response Fails The Client
+    [Documentation]    The response still claims its full length, so the client waits for
+    ...    a rest that never comes. Which error that produces is the client's business.
+    Simulate Truncated Response    cut    /test_post    keep_bytes=5
+    Run Keyword And Expect Error    *
+    ...    POST On Session    alias=proxy    url=test_post/1    timeout=5
+
+A Response Shorter Than The Cut Is Left Alone
+    Simulate Truncated Response    cut    /test_post    keep_bytes=1000
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+
 Delayed Response With Post
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     Add Response Delay    alias=delay    url=test_post    delay=5s

@@ -82,6 +82,18 @@ Two behaviour changes come with it:
   than leaving the proxy to fail to start for an unstated reason.
 - `Start Mitm Proxy` takes `proxy_auth`, requiring clients to authenticate before the
   proxy serves them.
+- Failure simulation, for the paths an application exercises least. `Simulate Timeout`
+  holds a request and then drops it without contacting the server, which is what a client
+  sees when a service accepts a connection and says nothing - a different test from a
+  service that answers with an error. `Simulate Truncated Response` cuts an answer short
+  while it still claims its full length, which is what a connection dropped mid-answer
+  looks like. A dropped connection is `Block Requests` with `mode=RESET` rather than a
+  keyword of its own.
+
+  Bandwidth throttling is deliberately not supported: mitmproxy hands a response body to
+  a synchronous callback with no way to wait between chunks, so the only implementable
+  version would delay the whole body and deliver it in one piece, which is
+  `Add Response Delay` under a name that would promise more than it does.
 - `Get Proxy Rules` returns the loaded rules in the order they are applied.
 - Blocking rules have an alias, like every other rule, so they are removed the same way.
 - Rules survive a restart of the proxy: the registry outlives it, and only the addon
