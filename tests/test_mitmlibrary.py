@@ -195,6 +195,38 @@ class TestMitmLibraryGuards(unittest.TestCase):
         self.library.clear_all_rules()
         self.assertEqual(self.library.get_proxy_rules(), [])
 
+    def test_request_and_response_rule_keywords_register_rules(self):
+        """The keywords added for request-side manipulation must reach the registry."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+
+        self.library.set_request_headers("req_headers", "/api", {"A": "1"}, ["B"])
+        self.library.set_request_body("req_body", "/api", "payload")
+        self.library.rewrite_request_url("rewrite", "/api", "http://other/api")
+        self.library.redirect_requests_to_host("redirect", "/api", "127.0.0.1", 8000)
+        self.library.set_response_headers("resp_headers", "/api", {"C": "2"})
+        self.library.set_response_body("resp_body", "/api", "body")
+
+        rules = {rule.alias: rule for rule in self.library.get_proxy_rules()}
+        self.assertEqual(rules["req_headers"]["type"], "request_headers")
+        self.assertEqual(rules["req_headers"]["remove"], ["B"])
+        self.assertEqual(rules["req_body"]["body"], "payload")
+        self.assertEqual(rules["rewrite"]["target"], "http://other/api")
+        self.assertEqual(rules["redirect"]["port"], 8000)
+        self.assertEqual(rules["resp_headers"]["type"], "response_headers")
+        self.assertEqual(rules["resp_body"]["type"], "response_body")
+
+    def test_request_rules_are_applied_before_response_rules(self):
+        """Get Proxy Rules reports application order, and request rules come first."""
+        with patch("MitmLibrary.dump.DumpMaster") as mock_master:
+            self._bound_master(mock_master)
+            self.library.start_mitm_proxy()
+        self.library.set_response_body("resp", "/api", "body")
+        self.library.set_request_headers("req", "/api", {"A": "1"})
+        phases = [rule["phase"] for rule in self.library.get_proxy_rules()]
+        self.assertEqual(phases, ["request", "response"])
+
     def test_logging_rules_when_there_are_none(self):
         with patch("MitmLibrary.dump.DumpMaster") as mock_master:
             self._bound_master(mock_master)

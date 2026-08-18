@@ -138,6 +138,49 @@ An Invalid Regular Expression Fails Immediately
     Run Keyword And Expect Error    *not a valid regular expression*
     ...    Set Response Status    alias=bad    url=[unclosed    status_code=${418}    match=REGEX
 
+Request Headers Can Be Added And Removed
+    [Documentation]    The request really reaches the server, carrying the new headers.
+    ...    The fake server echoes nothing back, so this asserts through the proxy's own
+    ...    view of the rule instead of the response body.
+    VAR    &{headers}    Authorization=Bearer test-token
+    Set Request Headers    auth    /test_post    headers=${headers}    remove=['X-Drop']
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    ${rules}    Get Proxy Rules
+    Should Be Equal    ${rules}[0][type]    request_headers
+    Should Be Equal As Integers    ${rules}[0][used]    1
+
+Request Body Can Be Replaced
+    [Documentation]    The path decides the answer, so replacing the body must not
+    ...    change it: this proves the request still completed after being rewritten.
+    Set Request Body    payload    /test_post    {"replaced": true}    method=POST
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+
+Requests Can Be Redirected To Another Host
+    [Documentation]    Sends a request for post 1 to the TLS server instead, keeping the
+    ...    path. The answer proves the request was really re-routed rather than faked:
+    ...    a stubbed response could not have come from a different server.
+    Redirect Requests To Host    stub    /test_post    127.0.0.1
+    ...    port=${HTTPS_PORT}    scheme=https
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+
+Request Urls Can Be Rewritten
+    [Documentation]    Rewrites a request for a path that returns "smaller than 2" into
+    ...    one for a path that returns "larger than 2".
+    Rewrite Request Url    v2    /test_post/1    ${HTTP_URL}/test_post/3
+    Check POST Response    <number_size>larger than 2</number_size>    ${200}
+
+Response Headers Are Merged Rather Than Replaced
+    VAR    &{headers}    Cache-Control=no-store
+    Set Response Headers    caching    test_post    headers=${headers}
+    ${response}    POST On Session    alias=proxy    url=test_post/1    expected_status=any
+    Should Be Equal    ${response.headers}[Cache-Control]    no-store
+    # The original content type survives, which is the difference from Set Response.
+    Should Contain    ${response.headers}[Content-Type]    text/html
+
+Response Body Can Be Replaced On Its Own
+    Set Response Body    body    test_post    replaced body
+    Check POST Response    replaced body    ${200}
+
 Delayed Response With Post
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     Add Response Delay    alias=delay    url=test_post    delay=5s
@@ -227,17 +270,19 @@ Start Servers
 
 Start Web Servers
     [Documentation]    Starts a plain and a TLS server on free ports and waits for both.
-    ${http_port}    Get Free Port
-    ${https_port}    Get Free Port
-    VAR    ${HTTP_HOST}    127.0.0.1:${http_port}    scope=suite
-    VAR    ${HTTP_URL}    http://127.0.0.1:${http_port}    scope=suite
-    VAR    ${HTTPS_URL}    https://127.0.0.1:${https_port}    scope=suite
+    ${plain_port}    Get Free Port
+    ${secure_port}    Get Free Port
+    VAR    ${HTTP_PORT}    ${plain_port}    scope=suite
+    VAR    ${HTTPS_PORT}    ${secure_port}    scope=suite
+    VAR    ${HTTP_HOST}    127.0.0.1:${HTTP_PORT}    scope=suite
+    VAR    ${HTTP_URL}    http://127.0.0.1:${HTTP_PORT}    scope=suite
+    VAR    ${HTTPS_URL}    https://127.0.0.1:${HTTPS_PORT}    scope=suite
 
     ${http_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
-    ...    run    --host    127.0.0.1    --port    ${http_port}
+    ...    run    --host    127.0.0.1    --port    ${HTTP_PORT}
     ...    stdout=${OUTPUT_DIR}/flask_http.log    stderr=STDOUT
     ${https_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
-    ...    run    --host    127.0.0.1    --port    ${https_port}    --cert    adhoc
+    ...    run    --host    127.0.0.1    --port    ${HTTPS_PORT}    --cert    adhoc
     ...    stdout=${OUTPUT_DIR}/flask_https.log    stderr=STDOUT
     VAR    ${HTTP_PROCESS}    ${http_process}    scope=suite
     VAR    ${HTTPS_PROCESS}    ${https_process}    scope=suite

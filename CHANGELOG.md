@@ -52,11 +52,21 @@ Two behaviour changes come with it:
   rule stays visible in `Get Proxy Rules` with `remaining=0` rather than disappearing.
   An unusable regular expression fails the keyword that configured it, not the proxy
   later.
+- Request-side manipulation, which the library could not do at all before: it could
+  change what came back but never what was sent.
+  - `Set Request Headers` and `Set Response Headers` set and remove named headers,
+    merging rather than replacing, so adding one header does not mean restating the
+    others.
+  - `Set Request Body` and `Set Response Body` replace a body and update its
+    `content-length` to match.
+  - `Rewrite Request Url` sends a request to a different url entirely.
+  - `Redirect Requests To Host` sends it to a different host, keeping the path and
+    query, and updates the `Host` header so the receiving server is addressed by a name
+    it answers to.
 - `Get Proxy Rules` returns the loaded rules in the order they are applied.
 - Blocking rules have an alias, like every other rule, so they are removed the same way.
 - Rules survive a restart of the proxy: the registry outlives it, and only the addon
   reading it is rebuilt.
-
 - `Get Proxy Address` returns the host, port and url the proxy is actually listening on.
   It reads the address from the running proxy rather than echoing back the arguments,
   which is what makes `listen_port=0` usable: the operating system picks a free port and
