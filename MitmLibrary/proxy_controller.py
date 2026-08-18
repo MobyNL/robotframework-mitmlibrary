@@ -13,9 +13,10 @@ import asyncio
 import logging
 import time
 from concurrent.futures import Future, TimeoutError as FutureTimeoutError
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 from mitmproxy import options
+from mitmproxy.proxy import mode_specs
 from mitmproxy.tools import dump
 from robot.api import logger
 
@@ -68,6 +69,8 @@ class ProxyController:
         certificates_directory: Optional[str],
         ssl_insecure: bool,
         addon_factory: AddonFactory,
+        mode: Optional[Union[str, Sequence[str]]] = None,
+        proxy_auth: Optional[str] = None,
     ) -> None:
         """Starts the proxy and waits until it is actually listening.
 
@@ -84,6 +87,8 @@ class ProxyController:
         }
         if certificates_directory is not None:
             option_kwargs["confdir"] = certificates_directory
+        if mode is not None:
+            option_kwargs["mode"] = self._parse_modes(mode)
         opts = options.Options(**option_kwargs)
         # Bind the master to the loop it will actually run on. Without this it binds
         # to whatever loop happens to be running on the calling thread, which is not
@@ -95,6 +100,11 @@ class ProxyController:
             with_dumper=False,
         )
         self.master = master
+        if proxy_auth is not None:
+            # proxyauth belongs to the addon of the same name, which registers it when
+            # the master loads its addons, so it does not exist yet when the options are
+            # built above.
+            master.options.update(proxyauth=proxy_auth)
         self._disable_errorcheck(master)
         for addon in addon_factory(master):
             master.addons.add(addon)
@@ -109,6 +119,27 @@ class ProxyController:
             )
         finally:
             logging.getLogger().removeHandler(collector)
+
+    @staticmethod
+    def _parse_modes(mode: Union[str, Sequence[str]]) -> List[str]:
+        """Checks the mode specifications and returns them as mitmproxy wants them.
+
+        Parsing here means an unusable specification fails the keyword that gave it,
+        with mitmproxy's own explanation of what is wrong. Left to the proxy it would
+        surface as a startup timeout with nothing useful attached, because mitmproxy
+        logs the problem rather than raising it.
+        """
+        modes = [mode] if isinstance(mode, str) else list(mode)
+        for spec in modes:
+            try:
+                mode_specs.ProxyMode.parse(spec)
+            except ValueError as error:
+                raise ValueError(
+                    f"'{spec}' is not a usable proxy mode: {error}. Modes look like "
+                    f"'regular', 'reverse:http://host:port', 'upstream:http://host:port', "
+                    f"'transparent' or 'socks5', optionally followed by '@host:port'."
+                ) from error
+        return modes
 
     @staticmethod
     def _disable_errorcheck(master: dump.DumpMaster) -> None:

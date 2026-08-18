@@ -111,6 +111,24 @@ Be aware that `0.0.0.0` exposes an intercepting proxy on every network interface
 who can reach the machine can route their traffic through it.
 
 
+### Proxy modes
+
+By default the proxy is a forward proxy: a client is configured to send traffic through
+it. `mode` changes that:
+
+```robotframework
+# Stand in front of a service, so a client needs no proxy settings at all
+Start Mitm Proxy    mode=reverse:http://127.0.0.1:5000
+
+# Send everything on through the network's own proxy
+Start Mitm Proxy    mode=upstream:http://corporate-proxy:3128
+```
+
+`transparent` and `socks5` are passed through to mitmproxy too. A mode that cannot be
+understood fails `Start Mitm Proxy` rather than leaving the proxy to fail to start for an
+unstated reason. `proxy_auth` requires clients to authenticate before the proxy serves
+them.
+
 ### Why use Mitm?
 Mitm allows manipulation on single browser instance, by using a proxy. It does not
 require you to set up stubs or mocks that might influence the entire application at
