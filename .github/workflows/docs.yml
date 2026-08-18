@@ -79,8 +79,9 @@ jobs:
           cp MitmLibraryKeywords.html "site/${path}/MitmLibraryKeywords.html"
 
           if [ "${{ steps.target.outputs.release }}" = "true" ]; then
-            # The bare path is what pyproject.toml, the README and the metadata of every
-            # already published release point at, so it stays as the newest release.
+            # The bare path is what the metadata of every already published release
+            # points at, back to 0.1. Nothing in the repository links to it any more,
+            # but those releases cannot be changed, so it stays as the newest release.
             cp MitmLibraryKeywords.html site/MitmLibraryKeywords.html
             mkdir -p site/latest
             cp MitmLibraryKeywords.html site/latest/MitmLibraryKeywords.html

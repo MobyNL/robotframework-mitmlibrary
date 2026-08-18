@@ -7,7 +7,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/MobyNL/robotframework-mitmlibrary"
 repository = "https://github.com/MobyNL/robotframework-mitmlibrary"
-documentation = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
+documentation = "https://mobynl.github.io/robotframework-mitmlibrary/"
 packages = [{ include = "MitmLibrary" }]
 keywords = [
     "robotframework",
@@ -29,7 +29,7 @@ classifiers = [
 ]
 
 [tool.poetry.urls]
-"Keyword documentation" = "https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html"
+"Keyword documentation" = "https://mobynl.github.io/robotframework-mitmlibrary/"
 "Slack Channel" = "https://robotframework.slack.com/archives/C06M2J3J8AC"
 
 [tool.poetry.dependencies]
