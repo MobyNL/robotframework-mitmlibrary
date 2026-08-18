@@ -88,6 +88,16 @@ mitm. Follow the guide on the
 ## Documentation
 For detailed information on the available keywords and usage examples, please refer to the [Keyword Documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
 
+## API stability
+
+The keyword surface is **not yet stable**. Keyword names, argument names and their order
+may still change while the library is on 0.x, and the [CHANGELOG](CHANGELOG.md) records
+those changes.
+
+1.0.0 fixes the surface: it reworks the keywords once, deliberately and with a documented
+migration path, and from that release onwards names and argument order will not change
+within 1.x.
+
 ## Contributing
 Contributions are welcome! If you encounter any issues, have suggestions for improvements, or would like to add new features, feel free to open an issue or submit a pull request.
 
