@@ -1,5 +1,6 @@
 *** Settings ***
 Library             Collections
+Library             OperatingSystem
 Library             Process
 Library             Browser
 Library             RequestsLibrary
@@ -150,6 +151,24 @@ Open Browser Through Proxy
     New Context    ignoreHTTPSErrors=${True}
     New Page
 
+Wait For Server
+    [Documentation]    Waits for a server, reporting what it printed if it never answers.
+    ...    Without this the only signal is a timeout, which says nothing about why.
+    [Arguments]    ${url}    ${process}    ${log_file}
+    TRY
+        Wait Until Server Is Up    ${url}
+    EXCEPT    AS    ${error}
+        ${running}    Is Process Running    ${process}
+        ${output}    Run Keyword And Return Status    File Should Exist    ${log_file}
+        IF    ${output}
+            ${contents}    Get File    ${log_file}
+        ELSE
+            VAR    ${contents}    <no output captured>
+        END
+        Log    Server still running: ${running}${\n}Server output:${\n}${contents}    level=ERROR
+        Fail    ${error}
+    END
+
 Start Servers
     ${http_port}    Get Free Port
     ${https_port}    Get Free Port
@@ -161,12 +180,14 @@ Start Servers
 
     ${http_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
     ...    run    --host    127.0.0.1    --port    ${http_port}
+    ...    stdout=${OUTPUT_DIR}/flask_http.log    stderr=STDOUT
     ${https_process}    Start Process    flask    --app    ${CURDIR}/../resources/fake_website
     ...    run    --host    127.0.0.1    --port    ${https_port}    --cert    adhoc
+    ...    stdout=${OUTPUT_DIR}/flask_https.log    stderr=STDOUT
     VAR    ${HTTP_PROCESS}    ${http_process}    scope=suite
     VAR    ${HTTPS_PROCESS}    ${https_process}    scope=suite
-    Wait Until Server Is Up    ${HTTP_URL}/
-    Wait Until Server Is Up    ${HTTPS_URL}/
+    Wait For Server    ${HTTP_URL}/    ${HTTP_PROCESS}    ${OUTPUT_DIR}/flask_http.log
+    Wait For Server    ${HTTPS_URL}/    ${HTTPS_PROCESS}    ${OUTPUT_DIR}/flask_https.log
 
     # ssl_insecure is required because the local HTTPS server uses a self-signed
     # certificate, which the proxy would otherwise refuse to connect to.

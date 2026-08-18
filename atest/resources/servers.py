@@ -38,10 +38,9 @@ def wait_until_server_is_up(url: str, timeout: int = 30) -> None:
         try:
             with urlopen(url, timeout=2, context=context):
                 return
-        except URLError as error:
-            last_error = error
+        except (URLError, OSError) as error:
+            # Keep the type as well: "connection refused" (not started yet) and a
+            # timeout (reachable but not answering) need different fixes.
+            last_error = f"{type(error).__name__}: {error}"
             time.sleep(0.2)
-        except OSError as error:
-            last_error = error
-            time.sleep(0.2)
-    raise AssertionError(f"{url} did not come up within {timeout}s: {last_error}")
+    raise AssertionError(f"{url} did not come up within {timeout}s. Last error: {last_error}")
