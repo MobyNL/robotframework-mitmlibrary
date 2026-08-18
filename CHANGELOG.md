@@ -11,6 +11,14 @@ promise in the README.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.0.0] - 2026-08-18
+
+1.0.0 reworks the keyword surface once, deliberately, and then freezes it: from this
+release onwards keyword names, argument names and their order will not change within 1.x.
+See "API stability" in the README.
+
 ### Changed - breaking
 
 Every kind of manipulation used to have its own list, its own remove keyword and its own
@@ -125,4 +133,5 @@ Two behaviour changes come with it:
   module that reaches into mitmproxy's internals. This is internal, but it does move
   `MitmLibrary.STARTUP_TIMEOUT` and `MitmLibrary.SHUTDOWN_TIMEOUT` to that module.
 
-[Unreleased]: https://github.com/MobyNL/robotframework-mitmlibrary/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/MobyNL/robotframework-mitmlibrary/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/MobyNL/robotframework-mitmlibrary/compare/v0.3.0...v1.0.0

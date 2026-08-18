@@ -1,0 +1,110 @@
+name: Documentation
+
+# The keyword documentation is generated from the library itself and published to the
+# gh-pages branch, one directory per released version plus /dev for the current main.
+#
+# It is not committed to the repository. A rendered libdoc page carries the generation
+# time, the absolute path of the machine that produced it and the Robot Framework and
+# Python versions used, so a committed copy cannot be compared against a fresh one
+# without normalising all of that away - which was tried, was fragile, and failed three
+# release attempts before being removed. Generating on publish means there is nothing
+# that can drift.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Publishing rewrites a shared branch, so two runs must not do it at once.
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # Only this job writes, and only to the gh-pages branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install
+        run: poetry install
+
+      - name: Work out what is being published
+        id: target
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "path=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=dev" >> "$GITHUB_OUTPUT"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate the keyword documentation
+        run: poetry run python -m robot.libdoc MitmLibrary MitmLibraryKeywords.html
+
+      - name: Check out the published site
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code --heads origin gh-pages; then
+            git fetch origin gh-pages --depth 1
+            git worktree add site origin/gh-pages
+          else
+            # First publish: start the branch with no history of its own.
+            git worktree add --detach site
+            git -C site checkout --orphan gh-pages
+            git -C site rm -rf . --quiet || true
+          fi
+
+      - name: Add this version to the site
+        run: |
+          set -eu
+          path="${{ steps.target.outputs.path }}"
+          mkdir -p "site/${path}"
+          cp MitmLibraryKeywords.html "site/${path}/MitmLibraryKeywords.html"
+
+          if [ "${{ steps.target.outputs.release }}" = "true" ]; then
+            # The bare path is what pyproject.toml, the README and the metadata of every
+            # already published release point at, so it stays as the newest release.
+            cp MitmLibraryKeywords.html site/MitmLibraryKeywords.html
+            mkdir -p site/latest
+            cp MitmLibraryKeywords.html site/latest/MitmLibraryKeywords.html
+          fi
+
+          # GitHub Pages otherwise runs the site through Jekyll, which drops directories
+          # whose names begin with an underscore and needs no help here regardless.
+          touch site/.nojekyll
+
+          if [ "${{ steps.target.outputs.release }}" = "true" ]; then
+            poetry run python tools/build_docs_index.py \
+              site/versions.json site/index.html --add "$path" --release
+          else
+            poetry run python tools/build_docs_index.py \
+              site/versions.json site/index.html --add "$path"
+          fi
+
+      - name: Publish
+        run: |
+          cd site
+          git add -A
+          if git diff --cached --quiet; then
+            echo "The published documentation is already up to date."
+            exit 0
+          fi
+          git commit -m "docs: publish ${{ steps.target.outputs.path }} from ${GITHUB_SHA}"
+          git push origin HEAD:gh-pages

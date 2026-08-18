@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "robotframework-mitmlibrary"
-version = "0.3.0"
+version = "1.0.0"
 description = "A Robot Framework library for managing and manipulating HTTP requests and responses using a man-in-the-middle proxy approach. It allows blocking requests, customizing responses, adding delays, and more."
 authors = ["Mark <markmoberts@gmail.com>"]
 license = "MIT"
@@ -18,7 +18,7 @@ keywords = [
     "maninthemiddle",
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Framework :: Robot Framework :: Library",
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Testing",
