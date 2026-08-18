@@ -181,6 +181,56 @@ Response Body Can Be Replaced On Its Own
     Set Response Body    body    test_post    replaced body
     Check POST Response    replaced body    ${200}
 
+Traffic Can Be Recorded And Asserted On
+    [Documentation]    The library could always change traffic; this asserts on what the
+    ...    application under test actually sent, which it could not do before.
+    Start Recording
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    Request Should Have Been Made    /test_post/1    method=POST
+    Request Should Not Have Been Made    /never_called
+    ${requests}    Get Recorded Requests    /test_post
+    Length Should Be    ${requests}    1
+    Should Be Equal As Integers    ${requests}[0][status_code]    ${200}
+    Should Contain    ${requests}[0][response_body]    smaller than 2
+    [Teardown]    Stop Recording
+
+Recorded Requests Can Be Counted And Cleared
+    Start Recording
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    ${count}    Get Request Count    /test_post    method=POST
+    Should Be Equal As Integers    ${count}    2
+    Request Should Have Been Made    /test_post    times=2
+    Clear Recorded Requests
+    ${count}    Get Request Count
+    Should Be Equal As Integers    ${count}    0
+    [Teardown]    Stop Recording
+
+A Blocked Request Is Recorded Too
+    [Documentation]    A request that never reached the server is exactly the kind a
+    ...    suite wants to assert on.
+    Start Recording
+    Block Requests    posts    /test_post
+    Check POST Response    ${EMPTY}    ${403}
+    Request Should Have Been Made    /test_post
+    [Teardown]    Stop Recording
+
+Waiting For A Request That Has Already Been Made Returns At Once
+    Start Recording
+    Check POST Response    <number_size>smaller than 2</number_size>    ${200}
+    ${requests}    Wait Until Request Is Made    /test_post    timeout=5s
+    Length Should Be    ${requests}    1
+    [Teardown]    Stop Recording
+
+Waiting For A Request That Never Comes Fails
+    Start Recording
+    Run Keyword And Expect Error    *Waited*
+    ...    Wait Until Request Is Made    /never_called    timeout=500 ms
+    [Teardown]    Stop Recording
+
+Recording Keywords Explain Themselves When Recording Is Off
+    Run Keyword And Expect Error    *Start Recording*    Get Recorded Requests
+
 Delayed Response With Post
     Check POST Response    <number_size>smaller than 2</number_size>    ${200}
     Add Response Delay    alias=delay    url=test_post    delay=5s

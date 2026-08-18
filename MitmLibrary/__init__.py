@@ -23,6 +23,7 @@ from MitmLibrary.interceptor import Interceptor
 from MitmLibrary.listener import LibraryListener
 from MitmLibrary.matching import ANY_METHOD, MatchMode, UrlMatcher
 from MitmLibrary.proxy_controller import ProxyController
+from MitmLibrary.recorder import DEFAULT_BODY_LIMIT, DEFAULT_LIMIT, FlowRecorder
 from MitmLibrary.rules import (
     Action,
     BlockAction,
@@ -101,6 +102,20 @@ class MitmLibrary:
     A keyword takes effect from the next request onwards; a request already being handled
     finishes under the rules that were loaded when it started.
 
+    = Recording =
+    The proxy can remember the traffic that passes through it, so a suite can assert on
+    what the application under test actually sent rather than only on what came back.
+    Start it with `Start Recording`, or with `record=True` on `Start Mitm Proxy`, and ask
+    with `Get Recorded Requests`, `Get Request Count`, `Request Should Have Been Made`,
+    `Request Should Not Have Been Made` and `Wait Until Request Is Made`.
+
+    Recording is off by default. A long run holds a lot of traffic, so what is kept is
+    capped in two directions: how many requests are remembered, and how many bytes of
+    each body. When the first cap is reached the oldest request is dropped, and the
+    number dropped is reported in the failure message of an assertion rather than being
+    hidden. A body longer than the second cap is shortened, and the recorded request says
+    so.
+
     = Mitm Certificates =
     To test with SSL verification or use a browser without ignoring certificates, you need to set up
     certificates related to mitm. Follow the guide on the
@@ -131,6 +146,7 @@ class MitmLibrary:
         self.controller: ProxyController = ProxyController()
         self.registry: RuleRegistry = RuleRegistry()
         self.interceptor: Optional[Interceptor] = None
+        self.recorder: Optional[FlowRecorder] = None
         self.log_to_console: bool = True
         # Robot Framework calls close() on this when the suite that imported the library
         # ends, which releases the port even if the suite never stopped the proxy itself.
@@ -169,6 +185,9 @@ class MitmLibrary:
         certificates_directory: Optional[str] = None,
         ssl_insecure: bool = False,
         log_to_console: bool = True,
+        record: bool = False,
+        record_limit: int = DEFAULT_LIMIT,
+        record_body_limit: int = DEFAULT_BODY_LIMIT,
     ) -> None:
         """
         Starts a proxy at the given host and port.
@@ -182,6 +201,10 @@ class MitmLibrary:
           See the 'Mitm Certificates' section for more information.
         - ssl_insecure: If True, SSL verification is disabled.
         - log_to_console: If True, manipulated requests/responses are also logged to the console.
+        - record: If True, traffic is recorded from the start, as if `Start Recording`
+          had been called. Off by default; see the `Recording` section.
+        - record_limit: How many requests to keep when recording.
+        - record_body_limit: How many bytes of each body to keep when recording.
 
         Fails if the proxy cannot be started, for example when the port is already in use.
 
@@ -191,6 +214,8 @@ class MitmLibrary:
         See the 'Mitm Certificates' section in the documentation for more information.
         """
         self.log_to_console = log_to_console
+        if record:
+            self.recorder = FlowRecorder(record_limit, record_body_limit)
         try:
             self.controller.start(
                 listen_host,
@@ -204,6 +229,7 @@ class MitmLibrary:
             # addon it was built with has to go with it, or the next keyword would talk
             # to an interceptor belonging to a proxy that is not running.
             self.interceptor = None
+            self.recorder = None
             raise
 
     @not_keyword
@@ -214,7 +240,10 @@ class MitmLibrary:
         there afterwards. Only the addon reading them is rebuilt.
         """
         self.interceptor = Interceptor(self.registry, self.log_to_console)
-        return [self.interceptor]
+        addons: List[Any] = [self.interceptor]
+        if self.recorder is not None:
+            addons.append(self.recorder)
+        return addons
 
     @keyword
     def stop_mitm_proxy(self) -> None:
@@ -226,6 +255,7 @@ class MitmLibrary:
             return
         self.controller.discard()
         self.interceptor = None
+        self.recorder = None
 
     @keyword
     def get_proxy_address(self) -> DotDict:
@@ -649,6 +679,224 @@ class MitmLibrary:
         logger.info(f"{len(rules)} rule(s) are loaded, in the order they are applied:")
         for rule in rules:
             logger.info(f"{rule}")
+
+    @keyword
+    def start_recording(
+        self, limit: int = DEFAULT_LIMIT, body_limit: int = DEFAULT_BODY_LIMIT
+    ) -> None:
+        """Starts remembering the traffic that passes through the proxy.
+
+        Recording is off by default, because a long run holds a lot of traffic and
+        nothing should quietly turn into unbounded memory. What is kept is capped in two
+        directions, and both caps can be raised when a suite needs more.
+
+        - `limit`: How many requests to keep. Once full, the oldest is dropped, and the
+          number dropped is reported by the assertion keywords rather than being hidden.
+        - `body_limit`: How many bytes of each body to keep. A body longer than this is
+          shortened, and the recorded request says so.
+
+        Calling this again replaces what was recorded so far.
+
+        Example:
+        | Start Recording
+        | Start Recording    limit=50    body_limit=1024
+        """
+        self._require_proxy()
+        self.recorder = FlowRecorder(limit, body_limit)
+        self.controller.add_addon(self.recorder)
+
+    @keyword
+    def stop_recording(self) -> None:
+        """Stops recording traffic and forgets what was recorded.
+
+        Does nothing when nothing was being recorded.
+        """
+        if self.recorder is None:
+            logger.info("Nothing was being recorded.")
+            return
+        self.controller.remove_addon(self.recorder)
+        self.recorder = None
+
+    @keyword
+    def clear_recorded_requests(self) -> None:
+        """Forgets the requests recorded so far, and keeps recording.
+
+        Useful between tests, so one test does not assert on another test's traffic.
+        """
+        self._require_recorder().clear()
+
+    @keyword
+    def get_recorded_requests(
+        self,
+        url: Optional[str] = None,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+    ) -> List[DotDict]:
+        """Returns the recorded requests, oldest first.
+
+        Each request is a dictionary with `method`, `url`, `host`, `path`, `query`,
+        `request_headers`, `request_body`, `status_code`, `response_headers`,
+        `response_body`, `started`, `ended`, `duration` and `error`, plus
+        `request_body_truncated` and `response_body_truncated` telling you whether a body
+        was longer than the recorded limit.
+
+        - `url`: Only return requests whose url matches. All of them when not given.
+        - `method`: Only return requests with this method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+
+        Example:
+        | ${requests}    Get Recorded Requests    /api/users    method=POST
+        | Should Be Equal    ${requests}[0][status_code]    ${201}
+        """
+        return self._require_recorder().entries(self._recording_matcher(url, method, match))
+
+    @keyword
+    def get_request_count(
+        self,
+        url: Optional[str] = None,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+    ) -> int:
+        """Returns how many recorded requests match.
+
+        - `url`: Only count requests whose url matches. All of them when not given.
+        - `method`: Only count requests with this method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+
+        Example:
+        | ${count}    Get Request Count    /api/users
+        | Should Be Equal As Integers    ${count}    3
+        """
+        return self._require_recorder().count(
+            self._recording_matcher(url, method, match)
+        )
+
+    @keyword
+    def request_should_have_been_made(
+        self,
+        url: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        times: Optional[int] = None,
+        msg: Optional[str] = None,
+    ) -> None:
+        """Fails unless a matching request was recorded.
+
+        - `url`: The pattern the recorded url is compared against. See `match`.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `times`: Require exactly this many matching requests. Any number above zero
+          when not given.
+        - `msg`: Used instead of the default failure message.
+
+        The default failure message lists what *was* recorded, because the useful
+        question when this fails is what the application asked for instead.
+
+        Example:
+        | Request Should Have Been Made    /api/users    method=POST
+        | Request Should Have Been Made    /api/users    times=2
+        """
+        recorder = self._require_recorder()
+        matcher = self._recording_matcher(url, method, match)
+        found = recorder.count(matcher)
+        if times is None:
+            if found > 0:
+                return
+            expected = "at least one request"
+        else:
+            if found == times:
+                return
+            expected = f"exactly {times} request(s)"
+        raise AssertionError(
+            msg
+            or (
+                f"Expected {expected} matching {matcher.describe()}, but {found} "
+                f"were made. {recorder.summary()}"
+            )
+        )
+
+    @keyword
+    def request_should_not_have_been_made(
+        self,
+        url: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        msg: Optional[str] = None,
+    ) -> None:
+        """Fails when a matching request was recorded.
+
+        - `url`: The pattern the recorded url is compared against. See `match`.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `msg`: Used instead of the default failure message.
+
+        Example:
+        | Request Should Not Have Been Made    /api/telemetry
+        """
+        recorder = self._require_recorder()
+        matcher = self._recording_matcher(url, method, match)
+        found = recorder.count(matcher)
+        if found == 0:
+            return
+        made = ", ".join(
+            f"{entry.method} {entry.url}" for entry in recorder.entries(matcher)[:10]
+        )
+        raise AssertionError(
+            msg
+            or (
+                f"Expected no request matching {matcher.describe()}, but {found} "
+                f"were made: {made}."
+            )
+        )
+
+    @keyword
+    def wait_until_request_is_made(
+        self,
+        url: str,
+        method: str = ANY_METHOD,
+        match: MatchMode = MatchMode.SUBSTRING,
+        timeout: str = "10s",
+        count: int = 1,
+    ) -> List[DotDict]:
+        """Waits until matching requests have been recorded, and returns them.
+
+        For traffic a test does not trigger directly, such as a request a page makes
+        after it has loaded. Returns as soon as the request arrives rather than at the
+        end of a polling interval, and fails when the timeout passes first.
+
+        - `url`: The pattern the recorded url is compared against. See `match`.
+        - `method`: Only match this HTTP method. `ANY` matches every method.
+        - `match`: How `url` is interpreted. See the `Matching` section.
+        - `timeout`: How long to wait, in Robot Framework time format.
+        - `count`: How many matching requests to wait for.
+
+        Example:
+        | ${requests}    Wait Until Request Is Made    /api/events    timeout=5s
+        """
+        recorder = self._require_recorder()
+        matcher = self._recording_matcher(url, method, match)
+        return recorder.wait_for(matcher, timestr_to_secs(timeout), count)
+
+    @not_keyword
+    def _require_recorder(self) -> FlowRecorder:
+        """Returns the recorder, or explains how to get one."""
+        self._require_proxy()
+        if self.recorder is None:
+            raise RuntimeError(
+                "Traffic is not being recorded. Call 'Start Recording', or start the "
+                "proxy with record=True, before this keyword."
+            )
+        return self.recorder
+
+    @not_keyword
+    def _recording_matcher(
+        self, url: Optional[str], method: str, match: MatchMode
+    ) -> UrlMatcher:
+        """Builds the matcher the recording keywords filter with.
+
+        An empty pattern matches every url, which is what leaving `url` out means.
+        """
+        return UrlMatcher(url if url is not None else "", match, method)
 
     @keyword
     def turn_mitm_console_logging_off(self) -> None:
