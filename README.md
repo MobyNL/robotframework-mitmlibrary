@@ -2,8 +2,8 @@
 
 ![MitmLibrary Icon](https://github.com/MobyNL/robotframework-mitmlibrary/blob/main/MITMLibrary_small.png)
 
-## Keyword
-[Keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
+## Keyword documentation
+[Keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/), published per version.
 
 ## Overview
 
@@ -177,14 +177,13 @@ mitm. Follow the guide on the
 
 ## Documentation
 
-The [keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/MitmLibraryKeywords.html)
-describes every keyword, its arguments and examples.
+The [keyword documentation](https://mobynl.github.io/robotframework-mitmlibrary/) describes
+every keyword, its arguments and examples. It is published per version, so you can read the
+documentation for the version you actually have installed rather than for whatever is
+newest:
 
-It is published per version, so you can read the documentation for the version you
-actually have installed rather than for whatever is newest:
-
+- [all versions](https://mobynl.github.io/robotframework-mitmlibrary/) — start here
 - [latest release](https://mobynl.github.io/robotframework-mitmlibrary/latest/MitmLibraryKeywords.html)
-- [all versions](https://mobynl.github.io/robotframework-mitmlibrary/)
 - [current main, unreleased](https://mobynl.github.io/robotframework-mitmlibrary/dev/MitmLibraryKeywords.html)
 
 ## API stability
