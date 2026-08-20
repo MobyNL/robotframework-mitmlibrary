@@ -47,7 +47,7 @@ robotframework-requests = "^0.9.7"
 setuptools = ">=83,<85"
 ruff = "^0.12.4"
 mypy = "^1.18.2"
-robotframework-robocop = "^6.0.0"
+robotframework-robocop = ">=6,<8"
 
 [tool.ruff]
 target-version = "py312"  # the oldest Python the package supports
