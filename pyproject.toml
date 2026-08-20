@@ -45,7 +45,7 @@ coverage = "^7.6.10"
 robotframework-browser = ">=19.1.2,<21.0.0"
 robotframework-requests = "^0.9.7"
 setuptools = ">=83,<85"
-ruff = "^0.12.4"
+ruff = ">=0.12.4,<0.17.0"
 mypy = "^1.18.2"
 robotframework-robocop = "^6.0.0"
 
