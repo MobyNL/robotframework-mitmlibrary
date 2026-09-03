@@ -33,7 +33,7 @@ class AsyncLoopThread(Thread):
         asyncio.set_event_loop(self.loop)
         try:
             self.loop.run_forever()
-        except Exception as e:  # pylint: disable=broad-exception-caught
+        except Exception as e:  # noqa: BLE001 - best-effort loop shutdown, must not raise
             print(f"Async loop thread error: {e}")  # Log the error message
 
     def stop(self, timeout: float = 5) -> None:
@@ -51,5 +51,5 @@ class AsyncLoopThread(Thread):
             self.join(timeout=timeout)
         try:
             self.loop.close()
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:  # noqa: BLE001 - best-effort shutdown, must not raise
             print(f"Async loop thread could not be closed: {error}")

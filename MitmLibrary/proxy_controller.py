@@ -12,8 +12,9 @@ break, rather than being spread through the keyword definitions.
 import asyncio
 import logging
 import time
+from collections.abc import Callable, Sequence
 from concurrent.futures import Future, TimeoutError as FutureTimeoutError
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any
 
 from mitmproxy import options
 from mitmproxy.proxy import mode_specs
@@ -48,8 +49,8 @@ class StartupErrorCollector(logging.Handler):
 
     def __init__(self) -> None:
         super().__init__(level=logging.ERROR)
-        self.messages: List[str] = []
-        self.bind_failures: List[str] = []
+        self.messages: list[str] = []
+        self.bind_failures: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         if not record.name.startswith("mitmproxy"):
@@ -68,8 +69,8 @@ class ProxyController:
     """
 
     def __init__(self) -> None:
-        self.master: Optional[dump.DumpMaster] = None
-        self.future: Optional[Future] = None
+        self.master: dump.DumpMaster | None = None
+        self.future: Future | None = None
         self.loop_handler: AsyncLoopThread = AsyncLoopThread()
         self.loop_handler.start()
 
@@ -82,11 +83,11 @@ class ProxyController:
         self,
         listen_host: str,
         listen_port: int,
-        certificates_directory: Optional[str],
+        certificates_directory: str | None,
         ssl_insecure: bool,
         addon_factory: AddonFactory,
-        mode: Optional[Union[str, Sequence[str]]] = None,
-        proxy_auth: Optional[str] = None,
+        mode: str | Sequence[str] | None = None,
+        proxy_auth: str | None = None,
     ) -> None:
         """Starts the proxy and waits until it is actually listening.
 
@@ -96,7 +97,7 @@ class ProxyController:
         Raises RuntimeError if the proxy cannot be started, for example when the port is
         already in use.
         """
-        option_kwargs: Dict[str, Any] = {
+        option_kwargs: dict[str, Any] = {
             "listen_host": listen_host,
             "listen_port": listen_port,
             "ssl_insecure": ssl_insecure,
@@ -137,7 +138,7 @@ class ProxyController:
             logging.getLogger().removeHandler(collector)
 
     @staticmethod
-    def _parse_modes(mode: Union[str, Sequence[str]]) -> List[str]:
+    def _parse_modes(mode: str | Sequence[str]) -> list[str]:
         """Checks the mode specifications and returns them as mitmproxy wants them.
 
         Parsing here means an unusable specification fails the keyword that gave it,
@@ -235,12 +236,12 @@ class ProxyController:
             return
         try:
             self.master.addons.remove(addon)
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:  # noqa: BLE001 - best-effort shutdown, must not raise
             logger.info(f"The addon was already gone: {error}")
 
     def listen_addresses(
-        self, proxy_master: Optional[dump.DumpMaster] = None
-    ) -> List[Tuple[Any, ...]]:
+        self, proxy_master: dump.DumpMaster | None = None
+    ) -> list[tuple[Any, ...]]:
         """Returns the addresses the proxy server addon is currently bound to.
 
         Reads them from mitmproxy rather than echoing back the requested host and port,
@@ -275,7 +276,7 @@ class ProxyController:
                     f"The proxy did not shut down within {SHUTDOWN_TIMEOUT} seconds; "
                     f"its port may still be in use."
                 )
-            except Exception as error:  # pylint: disable=broad-exception-caught
+            except Exception as error:  # noqa: BLE001 - best-effort shutdown, must not raise
                 logger.info(f"The proxy stopped with an error: {error}")
         self._uninstall_log_handler()
         self.master = None
@@ -297,7 +298,7 @@ class ProxyController:
             return
         try:
             handler.uninstall()
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:  # noqa: BLE001 - best-effort shutdown, must not raise
             logger.info(f"Could not remove the mitmproxy log handler: {error}")
 
     def _close_servers(self) -> None:
@@ -315,7 +316,7 @@ class ProxyController:
             asyncio.run_coroutine_threadsafe(
                 proxyserver.servers.update([]), self.loop_handler.loop
             ).result(timeout=SHUTDOWN_TIMEOUT)
-        except Exception as error:  # pylint: disable=broad-exception-caught
+        except Exception as error:  # noqa: BLE001 - best-effort shutdown, must not raise
             logger.warn(f"Could not close the proxy servers cleanly: {error}")
 
     def shutdown(self) -> None:

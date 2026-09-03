@@ -12,7 +12,8 @@ Framework tests, enabling you to simulate various network conditions and test yo
 applications in a more realistic and controlled environment.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import Any
 
 from mitmproxy.tools import dump
 from robot.api import logger
@@ -202,15 +203,15 @@ class MitmLibrary:
         """
         self.controller: ProxyController = ProxyController()
         self.registry: RuleRegistry = RuleRegistry()
-        self.interceptor: Optional[Interceptor] = None
-        self.recorder: Optional[FlowRecorder] = None
+        self.interceptor: Interceptor | None = None
+        self.recorder: FlowRecorder | None = None
         self.log_to_console: bool = True
         # Robot Framework calls close() on this when the suite that imported the library
         # ends, which releases the port even if the suite never stopped the proxy itself.
         self.ROBOT_LIBRARY_LISTENER: LibraryListener = LibraryListener(self.controller)
 
     @property
-    def proxy_master(self) -> Optional[dump.DumpMaster]:
+    def proxy_master(self) -> dump.DumpMaster | None:
         """The running mitmproxy master, or None when no proxy is running."""
         return self.controller.master
 
@@ -239,14 +240,14 @@ class MitmLibrary:
         self,
         listen_host: str = "127.0.0.1",
         listen_port: int = 8080,
-        certificates_directory: Optional[str] = None,
+        certificates_directory: str | None = None,
         ssl_insecure: bool = False,
         log_to_console: bool = True,
         record: bool = False,
         record_limit: int = DEFAULT_LIMIT,
         record_body_limit: int = DEFAULT_BODY_LIMIT,
-        mode: Optional[Union[str, List[str]]] = None,
-        proxy_auth: Optional[str] = None,
+        mode: str | list[str] | None = None,
+        proxy_auth: str | None = None,
     ) -> None:
         """
         Starts a proxy at the given host and port.
@@ -309,7 +310,7 @@ class MitmLibrary:
         there afterwards. Only the addon reading them is rebuilt.
         """
         self.interceptor = Interceptor(self.registry, self.log_to_console)
-        addons: List[Any] = [self.interceptor]
+        addons: list[Any] = [self.interceptor]
         if self.recorder is not None:
             addons.append(self.recorder)
         return addons
@@ -362,7 +363,7 @@ class MitmLibrary:
         url: str,
         mode: BlockMode = BlockMode.RESPOND,
         status_code: int = 403,
-        body: Optional[str] = None,
+        body: str | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
         times: int = 0,
@@ -397,8 +398,8 @@ class MitmLibrary:
         alias: str,
         url: str,
         status_code: int = 200,
-        headers: Optional[Dict[str, str]] = None,
-        body: Optional[str] = None,
+        headers: dict[str, str] | None = None,
+        body: str | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
         times: int = 0,
@@ -510,8 +511,8 @@ class MitmLibrary:
         self,
         alias: str,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        remove: Optional[List[str]] = None,
+        headers: dict[str, str] | None = None,
+        remove: list[str] | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
         times: int = 0,
@@ -574,8 +575,8 @@ class MitmLibrary:
         self,
         alias: str,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
-        remove: Optional[List[str]] = None,
+        headers: dict[str, str] | None = None,
+        remove: list[str] | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
         times: int = 0,
@@ -671,8 +672,8 @@ class MitmLibrary:
         alias: str,
         url: str,
         host: str,
-        port: Optional[int] = None,
-        scheme: Optional[str] = None,
+        port: int | None = None,
+        scheme: str | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
         times: int = 0,
@@ -743,7 +744,7 @@ class MitmLibrary:
         self,
         alias: str,
         url: str,
-        keep_bytes: Optional[int] = None,
+        keep_bytes: int | None = None,
         keep_fraction: float = 0.5,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
@@ -806,7 +807,7 @@ class MitmLibrary:
         self._require_registry().clear()
 
     @keyword
-    def get_proxy_rules(self) -> List[DotDict]:
+    def get_proxy_rules(self) -> list[DotDict]:
         """Returns the loaded rules, in the order they are applied.
 
         Each rule is a dictionary with at least `alias`, `url`, `match`, `method`,
@@ -879,10 +880,10 @@ class MitmLibrary:
     @keyword
     def get_recorded_requests(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
-    ) -> List[DotDict]:
+    ) -> list[DotDict]:
         """Returns the recorded requests, oldest first.
 
         Each request is a dictionary with `method`, `url`, `host`, `path`, `query`,
@@ -904,7 +905,7 @@ class MitmLibrary:
     @keyword
     def get_request_count(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
     ) -> int:
@@ -928,8 +929,8 @@ class MitmLibrary:
         url: str,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
-        times: Optional[int] = None,
-        msg: Optional[str] = None,
+        times: int | None = None,
+        msg: str | None = None,
     ) -> None:
         """Fails unless a matching request was recorded.
 
@@ -972,7 +973,7 @@ class MitmLibrary:
         url: str,
         method: str = ANY_METHOD,
         match: MatchMode = MatchMode.SUBSTRING,
-        msg: Optional[str] = None,
+        msg: str | None = None,
     ) -> None:
         """Fails when a matching request was recorded.
 
@@ -1008,7 +1009,7 @@ class MitmLibrary:
         match: MatchMode = MatchMode.SUBSTRING,
         timeout: str = "10s",
         count: int = 1,
-    ) -> List[DotDict]:
+    ) -> list[DotDict]:
         """Waits until matching requests have been recorded, and returns them.
 
         For traffic a test does not trigger directly, such as a request a page makes
@@ -1041,7 +1042,7 @@ class MitmLibrary:
 
     @not_keyword
     def _recording_matcher(
-        self, url: Optional[str], method: str, match: MatchMode
+        self, url: str | None, method: str, match: MatchMode
     ) -> UrlMatcher:
         """Builds the matcher the recording keywords filter with.
 

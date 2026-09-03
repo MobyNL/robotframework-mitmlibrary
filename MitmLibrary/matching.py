@@ -11,7 +11,7 @@ import fnmatch
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Pattern
+from re import Pattern
 
 ANY_METHOD = "ANY"
 
@@ -47,7 +47,7 @@ class UrlMatcher:
     pattern: str
     mode: MatchMode = MatchMode.SUBSTRING
     method: str = ANY_METHOD
-    _regex: Optional[Pattern[str]] = field(default=None, init=False, repr=False)
+    _regex: Pattern[str] | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         # The dataclass is frozen so that a rule cannot change what it matches while the
@@ -56,7 +56,7 @@ class UrlMatcher:
         object.__setattr__(self, "method", (self.method or ANY_METHOD).strip().upper())
         object.__setattr__(self, "_regex", self._compile())
 
-    def _compile(self) -> Optional[Pattern[str]]:
+    def _compile(self) -> Pattern[str] | None:
         """Builds the expression for the mode, or None when the mode needs no expression."""
         if self.mode is MatchMode.SUBSTRING:
             return None
@@ -77,13 +77,13 @@ class UrlMatcher:
             return self._regex.match(url) is not None
         return self._regex.search(url) is not None
 
-    def matches_method(self, method: Optional[str]) -> bool:
+    def matches_method(self, method: str | None) -> bool:
         """Whether the method matches. `ANY` matches everything, including no method."""
         if self.method == ANY_METHOD:
             return True
         return (method or "").upper() == self.method
 
-    def matches(self, url: str, method: Optional[str] = None) -> bool:
+    def matches(self, url: str, method: str | None = None) -> bool:
         """Whether both the url and the method match."""
         return self.matches_method(method) and self.matches_url(url)
 

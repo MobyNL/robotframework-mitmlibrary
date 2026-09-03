@@ -18,7 +18,7 @@ arrives instead of at the end of its next poll.
 import threading
 import time
 from collections import deque
-from typing import Any, Deque, Dict, List, Optional
+from typing import Any
 
 from mitmproxy import http
 from robot.utils import DotDict
@@ -29,7 +29,7 @@ DEFAULT_LIMIT = 1000
 DEFAULT_BODY_LIMIT = 65536
 
 
-def _decode(content: Optional[bytes], limit: int) -> Any:
+def _decode(content: bytes | None, limit: int) -> Any:
     """Returns the body as text, shortened to the limit, and whether it was shortened."""
     if content is None:
         return None, False
@@ -53,7 +53,7 @@ class FlowRecorder:
         self.body_limit = body_limit
         self._lock = threading.Lock()
         self._new_entry = threading.Condition(self._lock)
-        self._entries: Deque[DotDict] = deque(maxlen=limit)
+        self._entries: deque[DotDict] = deque(maxlen=limit)
         self._dropped = 0
 
     @property
@@ -122,7 +122,7 @@ class FlowRecorder:
             }
         )
 
-    def entries(self, matcher: Optional[UrlMatcher] = None) -> List[DotDict]:
+    def entries(self, matcher: UrlMatcher | None = None) -> list[DotDict]:
         """The recorded requests, oldest first, optionally only the matching ones."""
         with self._lock:
             recorded = list(self._entries)
@@ -130,7 +130,7 @@ class FlowRecorder:
             return recorded
         return [entry for entry in recorded if matcher.matches(entry.url, entry.method)]
 
-    def count(self, matcher: Optional[UrlMatcher] = None) -> int:
+    def count(self, matcher: UrlMatcher | None = None) -> int:
         """How many recorded requests match."""
         return len(self.entries(matcher))
 
@@ -142,7 +142,7 @@ class FlowRecorder:
 
     def wait_for(
         self, matcher: UrlMatcher, timeout: float, count: int = 1
-    ) -> List[DotDict]:
+    ) -> list[DotDict]:
         """Waits until at least `count` recorded requests match, and returns them.
 
         Raises AssertionError when the timeout passes first, so Robot Framework reports it
@@ -187,7 +187,7 @@ class FlowRecorder:
             )
         return described
 
-    def stats(self) -> Dict[str, int]:
+    def stats(self) -> dict[str, int]:
         """How much was recorded and how much was dropped."""
         with self._lock:
             return {

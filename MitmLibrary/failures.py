@@ -14,7 +14,7 @@ everything else is built on.
 
 import asyncio
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any
 
 from mitmproxy import http
 from robot.api import logger
@@ -46,7 +46,7 @@ class TimeoutAction(Action):
         kill_flow(flow)
         return True
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {"type": "timeout", "hold": self.hold, "hold_seconds": self.hold_seconds}
 
 
@@ -61,7 +61,7 @@ class TruncateAction(Action):
     with the response at all.
     """
 
-    keep_bytes: Optional[int] = None
+    keep_bytes: int | None = None
     keep_fraction: float = 0.5
 
     phase = Phase.RESPONSE
@@ -92,7 +92,7 @@ class TruncateAction(Action):
             return max(0, self.keep_bytes)
         return max(0, int(length * self.keep_fraction))
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {
             "type": "truncate",
             "keep_bytes": self.keep_bytes,
