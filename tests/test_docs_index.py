@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
 
-import build_docs_index  # noqa: E402 - needs the path above
+import build_docs_index
 
 
 class TestUpdateVersions(unittest.TestCase):

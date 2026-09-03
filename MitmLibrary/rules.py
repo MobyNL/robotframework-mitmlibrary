@@ -14,9 +14,10 @@ registry mutates a rule, and only its own bookkeeping.
 
 import asyncio
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum, IntEnum
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any
 
 from mitmproxy import http
 from robot.api import logger
@@ -89,7 +90,7 @@ class Action:
         """Applies the action from an async hook. Overridden only by actions that wait."""
         return self.apply(flow)
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         """The action's settings, for `Get Proxy Rules` and the log."""
         raise NotImplementedError
 
@@ -100,7 +101,7 @@ class BlockAction(Action):
 
     mode: BlockMode = BlockMode.RESPOND
     status_code: int = 403
-    body: Optional[str] = None
+    body: str | None = None
 
     phase = Phase.REQUEST
     priority = Priority.TERMINAL
@@ -114,8 +115,8 @@ class BlockAction(Action):
         )
         return True
 
-    def describe(self) -> Dict[str, Any]:
-        described: Dict[str, Any] = {"type": "block", "mode": self.mode.value}
+    def describe(self) -> dict[str, Any]:
+        described: dict[str, Any] = {"type": "block", "mode": self.mode.value}
         if self.mode is BlockMode.RESPOND:
             described["status_code"] = self.status_code
             described["body"] = self.body
@@ -127,8 +128,8 @@ class ResponseAction(Action):
     """Replaces the whole response."""
 
     status_code: int = 200
-    headers: Optional[Dict[str, str]] = None
-    body: Optional[str] = None
+    headers: dict[str, str] | None = None
+    body: str | None = None
 
     phase = Phase.RESPONSE
     priority = Priority.REPLACE
@@ -156,7 +157,7 @@ class ResponseAction(Action):
             return flow.response.headers
         return http.Headers()
 
-    def _content(self, flow: http.HTTPFlow) -> Union[str, bytes]:
+    def _content(self, flow: http.HTTPFlow) -> str | bytes:
         """The body to use, keeping the original one when none was given."""
         if self.body is not None:
             return safe_str(self.body)
@@ -164,7 +165,7 @@ class ResponseAction(Action):
             return flow.response.content
         return b""
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {
             "type": "response",
             "status_code": self.status_code,
@@ -187,7 +188,7 @@ class StatusAction(Action):
             flow.response.status_code = self.status_code
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {"type": "status", "status_code": self.status_code}
 
 
@@ -208,7 +209,7 @@ class DelayAction(Action):
         await asyncio.sleep(self.seconds)
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {"type": "delay", "delay": self.delay, "seconds": self.seconds}
 
 
@@ -220,13 +221,13 @@ class HeadersAction(Action):
     adding one header should not mean restating every other header the response had.
     """
 
-    set_headers: Optional[Dict[str, str]] = None
-    remove_headers: Optional[Sequence[str]] = None
+    set_headers: dict[str, str] | None = None
+    remove_headers: Sequence[str] | None = None
 
     phase = Phase.RESPONSE
     priority = Priority.MUTATE
 
-    def _target(self, flow: http.HTTPFlow) -> Optional[http.Message]:
+    def _target(self, flow: http.HTTPFlow) -> http.Message | None:
         """The message this action edits."""
         return flow.response if self.phase is Phase.RESPONSE else flow.request
 
@@ -242,7 +243,7 @@ class HeadersAction(Action):
             message.headers[name] = value
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {
             "type": f"{self.phase.value}_headers",
             "headers": self.set_headers,
@@ -267,7 +268,7 @@ class BodyAction(Action):
     phase = Phase.RESPONSE
     priority = Priority.MUTATE
 
-    def _target(self, flow: http.HTTPFlow) -> Optional[http.Message]:
+    def _target(self, flow: http.HTTPFlow) -> http.Message | None:
         return flow.response if self.phase is Phase.RESPONSE else flow.request
 
     def apply(self, flow: http.HTTPFlow) -> bool:
@@ -279,7 +280,7 @@ class BodyAction(Action):
         message.set_content(safe_str(self.body).encode("utf-8"))
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {"type": f"{self.phase.value}_body", "body": self.body}
 
 
@@ -306,7 +307,7 @@ class RewriteAction(Action):
         flow.request.url = self.target
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {"type": "rewrite", "target": self.target}
 
 
@@ -315,8 +316,8 @@ class RedirectAction(Action):
     """Sends the request to a different host, keeping its path and query."""
 
     host: str = ""
-    port: Optional[int] = None
-    scheme: Optional[str] = None
+    port: int | None = None
+    scheme: str | None = None
 
     phase = Phase.REQUEST
     priority = Priority.MUTATE
@@ -337,7 +338,7 @@ class RedirectAction(Action):
             )
         return False
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         return {
             "type": "redirect",
             "host": self.host,
@@ -412,7 +413,7 @@ class RuleRegistry:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._rules: Dict[str, Rule] = {}
+        self._rules: dict[str, Rule] = {}
         self._counter = 0
 
     def add(self, rule: Rule) -> bool:
@@ -443,11 +444,11 @@ class RuleRegistry:
         with self._lock:
             self._rules.clear()
 
-    def get(self, alias: str) -> Optional[Rule]:
+    def get(self, alias: str) -> Rule | None:
         with self._lock:
             return self._rules.get(alias)
 
-    def snapshot(self, phase: Optional[Phase] = None) -> List[Rule]:
+    def snapshot(self, phase: Phase | None = None) -> list[Rule]:
         """The rules for a phase, in the order they should be applied.
 
         A copy, so the proxy can work through it while a keyword adds or removes rules.
@@ -481,6 +482,6 @@ class RuleRegistry:
             rule.used += 1
             return True
 
-    def describe(self) -> List[DotDict]:
+    def describe(self) -> list[DotDict]:
         """Every rule, in application order, for `Get Proxy Rules`."""
         return [rule.describe() for rule in self.snapshot()]
