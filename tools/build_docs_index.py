@@ -13,7 +13,7 @@ import html
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 DOCUMENT = "MitmLibraryKeywords.html"
 
@@ -71,7 +71,7 @@ records what changed.</p>
 """
 
 
-def _entry(version: Dict[str, Any]) -> str:
+def _entry(version: dict[str, Any]) -> str:
     """Renders one line of the list."""
     name = html.escape(str(version["version"]))
     path = html.escape(str(version["path"]))
@@ -81,7 +81,7 @@ def _entry(version: Dict[str, Any]) -> str:
     return f'  <li><a href="{path}/{DOCUMENT}">{name}</a>{tags}</li>'
 
 
-def render(versions: List[Dict[str, Any]]) -> str:
+def render(versions: list[dict[str, Any]]) -> str:
     """Renders the landing page for the given versions, newest first."""
     if not versions:
         entries = "  <li>No documentation has been published yet.</li>"
@@ -94,8 +94,8 @@ UNRELEASED = "unreleased"
 
 
 def update_versions(
-    versions: List[Dict[str, Any]], path: str, is_release: bool
-) -> List[Dict[str, Any]]:
+    versions: list[dict[str, Any]], path: str, is_release: bool
+) -> list[dict[str, Any]]:
     """Records a published version, and works out which release is the newest.
 
     `path` is the directory it was published under: a version number for a release, or
@@ -128,7 +128,7 @@ def _release_order(path: str) -> Any:
         return ()
 
 
-def _sort_key(version: Dict[str, Any]) -> Any:
+def _sort_key(version: dict[str, Any]) -> Any:
     """Orders releases newest first, with anything unreleased above them."""
     raw = str(version["version"])
     parts = raw.split(".")
@@ -139,7 +139,7 @@ def _sort_key(version: Dict[str, Any]) -> Any:
         return (-1, ())
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("versions", type=Path, help="the versions.json to read and write")
     parser.add_argument("output", type=Path, help="where to write index.html")
@@ -153,7 +153,7 @@ def main(argv: List[str]) -> int:
     )
     arguments = parser.parse_args(argv)
 
-    versions: List[Dict[str, Any]] = []
+    versions: list[dict[str, Any]] = []
     if arguments.versions.exists():
         versions = json.loads(arguments.versions.read_text(encoding="utf-8"))
     if arguments.add is not None:

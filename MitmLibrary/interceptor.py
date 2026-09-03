@@ -9,7 +9,6 @@ The rules themselves live in a RuleRegistry and know how to apply themselves, so
 only decides *when* they run, not *what* they do.
 """
 
-from typing import Optional
 
 from mitmproxy import http
 from robot.api import logger
@@ -69,7 +68,7 @@ class Interceptor:
         )
 
 
-def _method(flow: http.HTTPFlow) -> Optional[str]:
+def _method(flow: http.HTTPFlow) -> str | None:
     """The request method, or None when the flow does not report one."""
     method = getattr(flow.request, "method", None)
     return method if isinstance(method, str) else None

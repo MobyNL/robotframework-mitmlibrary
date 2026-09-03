@@ -48,7 +48,7 @@ async def _runs_until_stopped(stop):
 class _Handler(http.server.BaseHTTPRequestHandler):
     """Answers everything with a fixed body, so a test can tell it apart."""
 
-    def do_GET(self):  # noqa: N802 - the name is fixed by http.server
+    def do_GET(self):
         body = b"hello from the origin"
         self.send_response(200)
         self.send_header("Content-Length", str(len(body)))

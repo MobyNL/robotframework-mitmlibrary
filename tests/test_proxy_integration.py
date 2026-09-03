@@ -96,9 +96,8 @@ class TestProxyIntegration(unittest.TestCase):
         # ourselves proves. Opening a connection would prove it too, but a client that
         # connects and never sends a request makes the proxy log an error, and that
         # error then belongs to no test in particular.
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            with self.assertRaises(OSError):
-                sock.bind(("127.0.0.1", address.port))
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock, self.assertRaises(OSError):
+            sock.bind(("127.0.0.1", address.port))
 
     def test_an_unrelated_error_during_startup_does_not_fail_the_keyword(self):
         """A proxy stopped moments ago still logs from its own teardown, and the rest of
@@ -200,7 +199,7 @@ class TestProxyIntegration(unittest.TestCase):
         )
         try:
             opener.open(url, timeout=5).close()
-        except Exception:  # noqa: BLE001 - the answer does not matter, only the record
+        except Exception:  # noqa: BLE001, S110 - the answer does not matter, only the record
             pass
     def test_stopping_removes_the_mitmproxy_log_handler(self):
         """mitmproxy leaves a root logger handler behind that outlives its own loop.
