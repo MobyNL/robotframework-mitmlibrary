@@ -1622,7 +1622,7 @@ version = "1.1.2"
 description = "MessagePack serializer"
 optional = false
 python-versions = ">=3.9"
-groups = ["main"]
+groups = ["main", "dev"]
 files = [
     {file = "msgpack-1.1.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:0051fffef5a37ca2cd16978ae4f0aef92f164df86823871b5162812bebecd8e2"},
     {file = "msgpack-1.1.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:a605409040f2da88676e9c9e5853b3449ba8011973616189ea5ee55ddbc5bc87"},
@@ -2320,18 +2320,19 @@ test = ["coverage", "flake8", "flask", "pytest", "robotframework (>=3.2.1)", "si
 
 [[package]]
 name = "robotframework-robocop"
-version = "6.13.0"
+version = "7.2.0"
 description = "Static code analysis tool (linter) and code formatter for Robot Framework"
 optional = false
 python-versions = ">=3.9"
 groups = ["dev"]
 files = [
-    {file = "robotframework_robocop-6.13.0-py3-none-any.whl", hash = "sha256:7a1df77457151e199c8e327ebada245bee72037696807404c036d6e3c3ee82d4"},
-    {file = "robotframework_robocop-6.13.0.tar.gz", hash = "sha256:52b3bea1e9e053c5ccbfb713edd66233db5291815af2a07677afde876e1136be"},
+    {file = "robotframework_robocop-7.2.0-py3-none-any.whl", hash = "sha256:4ed807f49d8ddb64c40a013fa3f200b90c3e40b3d4ce4ae8ec3f045424967126"},
+    {file = "robotframework_robocop-7.2.0.tar.gz", hash = "sha256:20482f6cf0578558be8bca0a7655c74973d78deb33cbe71163bb7e2eec046b3d"},
 ]
 
 [package.dependencies]
 jinja2 = ">=3.1.4"
+msgpack = ">=1.0.0"
 pathspec = ">=0.12"
 platformdirs = ">=4.3"
 pytz = ">=2022.7"
@@ -2339,6 +2340,9 @@ rich = ">=10.11.0"
 robotframework = ">=4.0,<7.5"
 tomli-w = ">=1.0"
 typer-slim = ">=0.12.5"
+
+[package.extras]
+mcp = ["fastmcp (>=2.13.0) ; python_version >= \"3.10\""]
 
 [[package]]
 name = "ruamel-yaml"
