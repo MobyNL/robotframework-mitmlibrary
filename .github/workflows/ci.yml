@@ -4,9 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    # Nightly, so the unpinned job below reports a break in a dependency before a release does.
-    - cron: "17 3 * * *"
   workflow_dispatch:
 
 permissions:
