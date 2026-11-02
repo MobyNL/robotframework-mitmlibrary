@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         # mitmproxy requires 3.12, so the floor is higher than in the sibling libraries.
-        python-version: ["3.12", "3.13", "3.14"]
+        python-version: ["3.12", "3.13", "3.14", "3.15"]
         # The unit tests start a real proxy, which is worth exercising on every platform
         # the library claims to support. The acceptance suite cannot run on all of them;
         # see the acceptance-test job.
